@@ -44,7 +44,34 @@ function allocate(requests, shelters, inventory) {
             row.quantity = row.quantity - take;
             needed = needed - take;
             takes.push({ warehouse_id: row.warehouse_id, quantity: take });
+
         }
+
+        const totalSent = request.quantity - needed;
+
+        let status;
+        if (needed === 0) {
+            status = 'Fulfilled';
+        } else if (totalSent > 0) {
+            status = 'Partial';
+        } else {
+            status = 'Unfulfilled';
+        }
+
+        let reason = null;
+        if (status === 'Partial') {
+            reason = `Requested ${request.quantity}, only ${totalSent} available`;
+        } else if (status === 'Unfulfilled') {
+            reason = `No ${request.item} in stock`;
+        }
+
+        results.push({
+            request_id: request.request_id,
+            status: status,
+            quantity_allocated: totalSent,
+            takes: takes,
+            reason: reason,
+        });
     }
 
     return { results, stock };
