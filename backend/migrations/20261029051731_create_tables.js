@@ -48,7 +48,7 @@ exports.up = function(knex) {
  */
 exports.down = function(knex) {
     return knex.schema
-        .dropTableIfExists('allocation_log') // fix 3: points to requests, so drop it first
+        .dropTableIfExists('allocation_log')
         .dropTableIfExists('requests')
         .dropTableIfExists('inventory')
         .dropTableIfExists('shelters');
