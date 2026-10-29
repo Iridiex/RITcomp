@@ -1,0 +1,7 @@
+warehouse_id,item,quantity
+WH-1,water,300
+WH-1,food packs,200
+WH-1,blankets,60
+WH-2,water,150
+WH-2,food packs,100
+WH-2,first aid kits,20

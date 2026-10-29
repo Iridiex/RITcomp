@@ -28,6 +28,17 @@ exports.up = function(knex) {
             table.string('status').notNullable().defaultTo('Pending');
             table.integer('quantity_allocated').notNullable().defaultTo(0);
             table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
+        })
+        .createTable('allocation_log', (table) => {
+            table.increments('id');
+            table.string('run_id').notNullable();
+            table.string('request_id').notNullable()
+                .references('request_id').inTable('requests');
+            table.string('warehouse_id');
+            table.integer('quantity_sent').notNullable().defaultTo(0);
+            table.string('result').notNullable();
+            table.string('reason').nullable();
+            table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
         });
 };
 
@@ -37,6 +48,7 @@ exports.up = function(knex) {
  */
 exports.down = function(knex) {
     return knex.schema
+        .dropTableIfExists('allocation_log') // fix 3: points to requests, so drop it first
         .dropTableIfExists('requests')
         .dropTableIfExists('inventory')
         .dropTableIfExists('shelters');

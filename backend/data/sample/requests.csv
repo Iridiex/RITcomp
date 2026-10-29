@@ -1,0 +1,11 @@
+request_id,shelter_id,item,quantity,urgency
+RQ-001,SH-01,water,200,Critical
+RQ-002,SH-01,first aid kits,15,Critical
+RQ-003,SH-02,water,150,High
+RQ-004,SH-04,food packs,100,Moderate
+RQ-005,SH-04,first aid kits,15,Critical
+RQ-006,SH-03,water,200,Critical
+RQ-007,SH-02,Blankets,100,High
+RQ-008,SH-03,food packs,150,High
+RQ-009,SH-05,tents,10,Moderate
+RQ-010,SH-05,water,30,Moderate
