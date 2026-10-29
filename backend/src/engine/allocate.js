@@ -24,17 +24,15 @@ function orderWarehouses(inventory, item) {
 }
 
 function allocate(requests, shelters, inventory) {
-    // 1. Copy the stock, so the original list isn't changed
+
     const stock = inventory.map((row) => ({...row }));
 
-    // 2. Only requests still waiting, lined up in the right order
+
     const waiting = requests.filter((r) => r.status === 'Pending' || r.status === 'Partial');
     const queue = sortRequests(waiting, shelters);
 
-    // 3. Somewhere to write down what happened
     const results = [];
 
-    // 4. Go through the queue, one request at a time
     for (const request of queue) {
         let needed = request.quantity - request.quantity_allocated;
         const takes = [];
@@ -49,7 +47,6 @@ function allocate(requests, shelters, inventory) {
         }
     }
 
-    // 5. Hand back the decisions and the new stock levels
     return { results, stock };
 }
 
