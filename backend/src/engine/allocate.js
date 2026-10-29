@@ -17,4 +17,40 @@ function sortRequests(requests, shelters) {
     });
 }
 
-module.exports = { sortRequests };
+function orderWarehouses(inventory, item) {
+    return inventory
+        .filter((row) => row.item === item && row.quantity > 0)
+        .sort((a, b) => b.quantity - a.quantity);
+}
+
+function allocate(requests, shelters, inventory) {
+    // 1. Copy the stock, so the original list isn't changed
+    const stock = inventory.map((row) => ({...row }));
+
+    // 2. Only requests still waiting, lined up in the right order
+    const waiting = requests.filter((r) => r.status === 'Pending' || r.status === 'Partial');
+    const queue = sortRequests(waiting, shelters);
+
+    // 3. Somewhere to write down what happened
+    const results = [];
+
+    // 4. Go through the queue, one request at a time
+    for (const request of queue) {
+        let needed = request.quantity - request.quantity_allocated;
+        const takes = [];
+
+        for (const row of orderWarehouses(stock, request.item)) {
+            if (needed === 0) break;
+
+            const take = Math.min(needed, row.quantity);
+            row.quantity = row.quantity - take;
+            needed = needed - take;
+            takes.push({ warehouse_id: row.warehouse_id, quantity: take });
+        }
+    }
+
+    // 5. Hand back the decisions and the new stock levels
+    return { results, stock };
+}
+
+module.exports = { sortRequests, orderWarehouses, allocate };
