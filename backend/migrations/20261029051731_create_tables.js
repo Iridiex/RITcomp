@@ -17,6 +17,17 @@ exports.up = function(knex) {
             table.string('item').notNullable();
             table.integer('quantity').notNullable().defaultTo(0);
             table.unique(['warehouse_id', 'item']);
+        })
+        .createTable('requests', (table) => {
+            table.string('request_id').primary();
+            table.string('shelter_id').notNullable()
+                .references('shelter_id').inTable('shelters');
+            table.string('item').notNullable();
+            table.integer('quantity').notNullable();
+            table.string('urgency').notNullable();
+            table.string('status').notNullable().defaultTo('Pending');
+            table.integer('quantity_allocated').notNullable().defaultTo(0);
+            table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
         });
 };
 
@@ -26,6 +37,7 @@ exports.up = function(knex) {
  */
 exports.down = function(knex) {
     return knex.schema
+        .dropTableIfExists('requests')
         .dropTableIfExists('inventory')
         .dropTableIfExists('shelters');
-}
+};
