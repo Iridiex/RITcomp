@@ -2,6 +2,7 @@ const knex = require('./db');
 const express = require('express');
 const cors = require('cors');
 const { runAllocation } = require('./services/allocationService');
+const { createRequest, reviewRequest } = require('./services/requestService');
 
 const app = express();
 
@@ -49,6 +50,35 @@ app.get('/api/allocations/log', async(req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Could not load log' });
+    }
+});
+
+app.post('/api/requests', async(req, res) => {
+    try {
+        const result = await createRequest(req.body);
+        if (result.errors) {
+            return res.status(400).json({ errors: result.errors });
+        }
+        res.status(201).json(result.request);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Could not save request' });
+    }
+});
+
+app.patch('/api/requests/:id/review', async(req, res) => {
+    try {
+        const result = await reviewRequest(req.params.id, req.body);
+        if (result.notFound) {
+            return res.status(404).json({ error: 'Request not found' });
+        }
+        if (result.errors) {
+            return res.status(400).json({ errors: result.errors });
+        }
+        res.json(result.request);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Could not review request' });
     }
 });
 
