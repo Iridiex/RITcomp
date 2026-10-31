@@ -6,4 +6,6 @@ const AUTH = bearer({ user_id: 0, username: 'test', name: 'Test Coordinator', ro
 const shelterAuth = (id) => bearer({ user_id: 0, username: 'shelter', name: 'Test Shelter', role: 'shelter', shelter_id: id });
 const warehouseAuth = (id) => bearer({ user_id: 0, username: 'warehouse', name: 'Test Warehouse', role: 'warehouse', warehouse_id: id });
 
-module.exports = { AUTH, shelterAuth, warehouseAuth };
+const driverAuth = (id) => bearer({ user_id: 0, username: 'driver', name: 'Test Driver', role: 'driver', driver_id: id });
+
+module.exports = { AUTH, shelterAuth, warehouseAuth, driverAuth };

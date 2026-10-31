@@ -6,7 +6,7 @@ export function loadSession() {
     try {
         const raw = localStorage.getItem(KEY);
         return raw ? JSON.parse(raw) : null;
-    } catch (err) {
+    } catch {
         return null;
     }
 }
@@ -15,7 +15,7 @@ function saveSession(session) {
     try {
         if (session) localStorage.setItem(KEY, JSON.stringify(session));
         else localStorage.removeItem(KEY);
-    } catch (err) {
+    } catch {
         return;
     }
 }

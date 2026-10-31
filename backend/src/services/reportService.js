@@ -20,7 +20,7 @@ async function buildReport() {
         shortfall: r.quantity - r.quantity_allocated,
         status: r.status,
         replacement_pending: Boolean(r.replacement_pending),
-        note: r.review_note || '',
+        note: r.close_note ? 'Closed: ' + r.close_note : r.review_note || '',
     }));
 
     const withStatus = (statuses) => rows.filter((r) => statuses.includes(r.status));
@@ -33,7 +33,7 @@ async function buildReport() {
         .leftJoin('requests', 'shipments.request_id', 'requests.request_id')
         .leftJoin('shelters', 'requests.shelter_id', 'shelters.shelter_id')
         .where('shipments.quantity_damaged', '>', 0)
-        .orWhere('shipments.status', 'Returned')
+        .orWhereIn('shipments.status', ['Returning', 'Returned'])
         .select('shipments.*', 'shelters.name as shelter_name')
         .orderBy('shipments.shipment_id');
 
@@ -60,6 +60,7 @@ async function buildReport() {
             pending: withStatus(['Pending']).length,
             awaiting_review: withStatus(['Awaiting review']).length,
             rejected: withStatus(['Rejected']).length,
+            cancelled: withStatus(['Cancelled']).length,
             replacement_pending: rows.filter((r) => r.replacement_pending).length,
             units_requested: unitsRequested,
             units_allocated: unitsAllocated,
@@ -71,7 +72,7 @@ async function buildReport() {
         fulfilled: withStatus(['Fulfilled']),
         unfulfilled: withStatus(['Partial', 'Unfulfilled']),
         open: withStatus(['Pending', 'Awaiting review', 'Allocated']),
-        rejected: withStatus(['Rejected']),
+        rejected: withStatus(['Rejected', 'Cancelled']),
         damaged,
         inventory: await knex('inventory').orderBy(['warehouse_id', 'item']),
     };

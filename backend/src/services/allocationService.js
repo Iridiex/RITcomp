@@ -1,7 +1,8 @@
 const knex = require('../db');
 const { allocate } = require('../engine/allocate');
+const { splitLoad } = require('../capacity');
 
-const ACTIVE = ['Ready', 'In transit'];
+const ACTIVE = ['Ready', 'In transit', 'Returning'];
 
 async function driverLoads(trx) {
     const drivers = await trx('drivers').orderBy('driver_id');
@@ -12,7 +13,11 @@ async function driverLoads(trx) {
     }));
 }
 
-function leastBusy(loads) {
+// `avoid` is a preference (falls back to anyone); `exclude` is strict (no driver rather than one of these)
+function leastBusy(allLoads, avoid = new Set(), exclude = new Set()) {
+    const eligible = allLoads.filter((d) => !exclude.has(d.driver_id));
+    const preferred = eligible.filter((d) => !avoid.has(d.driver_id));
+    const loads = preferred.length > 0 ? preferred : eligible;
     if (loads.length === 0) return null;
     const pick = loads.reduce((best, d) =>
         d.load < best.load || (d.load === best.load && d.driver_id < best.driver_id) ? d : best
@@ -26,10 +31,24 @@ async function nextShipmentNumber(trx) {
     return Math.max(0, ...rows.map((s) => Number(s.shipment_id.replace('SHP-', '')) || 0)) + 1;
 }
 
+async function failedDriversByRequest(trx) {
+    const rows = await trx('shipments')
+        .whereIn('status', ['Returning', 'Returned'])
+        .whereNotNull('driver_id')
+        .select('request_id', 'driver_id');
+    const byRequest = new Map();
+    for (const row of rows) {
+        if (!byRequest.has(row.request_id)) byRequest.set(row.request_id, new Set());
+        byRequest.get(row.request_id).add(row.driver_id);
+    }
+    return byRequest;
+}
+
 async function dispatch(trx, requests, runId) {
     const shelters = await trx('shelters');
     const inventory = await trx('inventory');
     const { results, stock } = allocate(requests, shelters, inventory);
+    const failedDrivers = await failedDriversByRequest(trx);
 
     for (const row of stock) {
         const before = inventory.find((i) => i.id === row.id);
@@ -73,23 +92,49 @@ async function dispatch(trx, requests, runId) {
                 reason: r.reason,
             });
 
-            const shipment = {
-                shipment_id: 'SHP-' + String(nextNumber).padStart(3, '0'),
-                run_id: runId,
-                request_id: r.request_id,
-                warehouse_id: t.warehouse_id,
-                item: request.item,
-                quantity: t.quantity,
-                status: 'Ready',
-                driver_id: leastBusy(loads),
-            };
-            await trx('shipments').insert(shipment);
-            shipments.push(shipment);
-            nextNumber += 1;
+            const carrying = new Set();
+            const avoid = failedDrivers.get(r.request_id);
+            for (const quantity of splitLoad(t.quantity)) {
+                const driverId = leastBusy(loads, avoid, carrying);
+                if (driverId) carrying.add(driverId);
+                const shipment = {
+                    shipment_id: 'SHP-' + String(nextNumber).padStart(3, '0'),
+                    run_id: runId,
+                    request_id: r.request_id,
+                    warehouse_id: t.warehouse_id,
+                    item: request.item,
+                    quantity,
+                    status: 'Ready',
+                    driver_id: driverId,
+                };
+                await trx('shipments').insert(shipment);
+                shipments.push(shipment);
+                nextNumber += 1;
+            }
         }
     }
 
     return { results, shipments };
+}
+
+async function assignWaiting(trx) {
+    const waiting = await trx('shipments').where({ status: 'Ready' }).whereNull('driver_id').orderBy('shipment_id');
+    if (waiting.length === 0) return [];
+    const loads = await driverLoads(trx);
+    const failedDrivers = await failedDriversByRequest(trx);
+    const assigned = [];
+    for (const s of waiting) {
+        const siblings = await trx('shipments')
+            .where({ run_id: s.run_id, request_id: s.request_id, warehouse_id: s.warehouse_id })
+            .whereIn('status', ['Ready', 'In transit'])
+            .whereNotNull('driver_id')
+            .pluck('driver_id');
+        const driverId = leastBusy(loads, failedDrivers.get(s.request_id), new Set(siblings));
+        if (!driverId) continue;
+        await trx('shipments').where({ shipment_id: s.shipment_id }).update({ driver_id: driverId });
+        assigned.push({ shipment_id: s.shipment_id, driver_id: driverId });
+    }
+    return assigned;
 }
 
 async function runAllocation() {
@@ -107,4 +152,17 @@ async function runAllocation() {
     });
 }
 
-module.exports = { runAllocation, dispatch };
+async function listShortages() {
+    const rows = await knex('requests').whereIn('status', ['Partial', 'Unfulfilled']);
+    const byItem = new Map();
+    for (const r of rows) {
+        const entry = byItem.get(r.item) || { item: r.item, short: 0, requests: 0, critical: 0 };
+        entry.short += r.quantity - r.quantity_allocated;
+        entry.requests += 1;
+        if (r.urgency === 'Critical') entry.critical += 1;
+        byItem.set(r.item, entry);
+    }
+    return [...byItem.values()].sort((a, b) => b.critical - a.critical || b.short - a.short);
+}
+
+module.exports = { runAllocation, dispatch, assignWaiting, listShortages, ACTIVE };

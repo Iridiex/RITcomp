@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const knex = require('./db');
 const { listShipments } = require('./services/shipmentService');
 const { listMovements } = require('./services/stockService');
+const { changeOwnLogin } = require('./services/userService');
 
 const SECRET = process.env.JWT_SECRET || 'dev-only-secret-change-me';
 const ALL = ['coordinator', 'shelter', 'warehouse', 'driver'];
@@ -11,15 +12,23 @@ const ALL = ['coordinator', 'shelter', 'warehouse', 'driver'];
 const RULES = [
     { methods: ['GET'], path: /^\/health$/, public: true },
     { methods: ['POST'], path: /^\/auth\/login$/, public: true },
-    { methods: ['GET'], path: /^\/auth\/me$/, roles: ALL },
+    { methods: ['GET', 'PATCH'], path: /^\/auth\/me$/, roles: ALL },
     { methods: ['GET'], path: /^\/requests$/, roles: ['coordinator', 'shelter'] },
     { methods: ['POST'], path: /^\/requests$/, roles: ['shelter'] },
     { methods: ['GET'], path: /^\/inventory$/, roles: ['coordinator', 'warehouse'] },
     { methods: ['POST'], path: /^\/inventory(\/remove)?$/, roles: ['warehouse'] },
     { methods: ['GET'], path: /^\/stock\/movements$/, roles: ['coordinator', 'warehouse'] },
+    { methods: ['GET'], path: /^\/shortages$/, roles: ['coordinator', 'warehouse'] },
+    { methods: ['GET'], path: /^\/items$/, roles: ALL },
+    { methods: ['POST'], path: /^\/urgency\/check$/, roles: ['coordinator', 'shelter'] },
+    { methods: ['GET'], path: /^\/ai\/status$/, roles: ALL },
+    { methods: ['GET'], path: /^\/incidents$/, roles: ['coordinator', 'driver'] },
+    { methods: ['POST'], path: /^\/speech$/, roles: ['coordinator', 'driver'] },
     { methods: ['GET'], path: /^\/(shelters|warehouses)$/, roles: ALL },
     { methods: ['GET'], path: /^\/shipments$/, roles: ALL },
+    { methods: ['PATCH'], path: /^\/requests\/[^/]+\/close$/, roles: ['coordinator', 'shelter'] },
     { methods: ['PATCH'], path: /^\/shipments\/[^/]+\/(pickup|deliver|fail)$/, roles: ['coordinator', 'driver'] },
+    { methods: ['PATCH'], path: /^\/shipments\/[^/]+\/return$/, roles: ['coordinator', 'driver', 'warehouse'] },
 ];
 
 function publicUser(user) {
@@ -85,6 +94,18 @@ authRouter.get('/auth/me', (req, res) => {
     res.json({ user: req.user });
 });
 
+// Wrong current password is a 400, not a 401: the frontend treats 401 as "session expired" and logs out
+authRouter.patch('/auth/me', async (req, res) => {
+    try {
+        const result = await changeOwnLogin(req.user.user_id, req.body);
+        if (result.notFound) return res.status(404).json({ error: 'Account not found' });
+        if (result.errors) return res.status(400).json({ errors: result.errors });
+        res.json({ token: signToken(result.user), user: publicUser(result.user) });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 authRouter.get('/requests', async (req, res, next) => {
     if (req.user.role !== 'shelter') return next();
     try {
@@ -99,6 +120,19 @@ authRouter.post('/requests', (req, res, next) => {
     req.body.shelter_id = req.user.shelter_id;
     req.body.submitted_by = 'shelter';
     next();
+});
+
+authRouter.patch('/requests/:id/close', async (req, res, next) => {
+    if (req.user.role !== 'shelter') return next();
+    try {
+        const request = await knex('requests').where({ request_id: req.params.id }).first();
+        if (request && request.shelter_id !== req.user.shelter_id) {
+            return res.status(403).json({ error: 'This request belongs to another shelter' });
+        }
+        next();
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 authRouter.get('/inventory', async (req, res, next) => {
@@ -143,11 +177,15 @@ authRouter.get('/shipments', async (req, res, next) => {
 });
 
 authRouter.patch('/shipments/:id/:action', async (req, res, next) => {
-    if (req.user.role !== 'driver') return next();
+    const { role } = req.user;
+    if (role !== 'driver' && role !== 'warehouse') return next();
     try {
         const shipment = await knex('shipments').where({ shipment_id: req.params.id }).first();
-        if (shipment && shipment.driver_id !== req.user.driver_id) {
+        if (role === 'driver' && shipment && shipment.driver_id !== req.user.driver_id) {
             return res.status(403).json({ error: 'This delivery is assigned to another driver' });
+        }
+        if (role === 'warehouse' && shipment && shipment.warehouse_id !== req.user.warehouse_id) {
+            return res.status(403).json({ error: 'This shipment belongs to another warehouse' });
         }
         next();
     } catch (err) {

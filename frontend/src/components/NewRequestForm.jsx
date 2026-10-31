@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Send } from 'lucide-react';
+import ItemPicker from './ItemPicker';
+import UrgencyHint from './UrgencyHint';
 import { API } from '../session';
 
 const URGENCIES = [
-    { value: 'Critical', help: 'people at risk within 24 hours' },
-    { value: 'High', help: 'needed within 2 to 3 days' },
-    { value: 'Moderate', help: 'comfort or planning' },
+    { value: 'Critical', help: 'people at risk within 24 hours', ask: 'Why is this critical?', example: 'e.g. 40 elderly residents, no clean water since this morning' },
+    { value: 'High', help: 'needed within 2 to 3 days', ask: 'Why do you need this soon?', example: 'e.g. Supplies run out on Thursday' },
+    { value: 'Moderate', help: 'comfort or planning', ask: 'What is this for?', example: 'e.g. Restocking for next week' },
 ];
 
-function NewRequestForm({ shelter, onCreated }) {
+function NewRequestForm({ shelter, items, onCreated }) {
     const [item, setItem] = useState('');
     const [quantity, setQuantity] = useState('');
     const [urgency, setUrgency] = useState('High');
@@ -16,15 +18,25 @@ function NewRequestForm({ shelter, onCreated }) {
     const [errors, setErrors] = useState([]);
     const [success, setSuccess] = useState('');
 
+    const chosen = items.find((i) => i.item === item.trim().toLowerCase());
+    const level = URGENCIES.find((u) => u.value === urgency);
+
     async function handleSubmit(e) {
         e.preventDefault();
         setErrors([]);
         setSuccess('');
+        const problems = [];
+        if (!chosen) problems.push(item.trim() ? `Choose an item from the list. Warehouses do not stock ${item.trim()}` : 'Choose an item');
+        if (!reason.trim()) problems.push('Say why you need this');
+        if (problems.length > 0) {
+            setErrors(problems);
+            return;
+        }
         try {
             const res = await fetch(`${API}/requests`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ item, quantity, urgency, reason }),
+                body: JSON.stringify({ item: chosen.item, quantity, urgency, reason }),
             });
             const data = await res.json();
             if (!res.ok) {
@@ -37,7 +49,7 @@ function NewRequestForm({ shelter, onCreated }) {
             setReason('');
             setUrgency('High');
             onCreated();
-        } catch (err) {
+        } catch {
             setErrors(['Could not reach the server']);
         }
     }
@@ -51,7 +63,7 @@ function NewRequestForm({ shelter, onCreated }) {
             <form className="form request-form" onSubmit={handleSubmit}>
                 <label>
                     Item
-                    <input value={item} onChange={(e) => setItem(e.target.value)} placeholder="water" />
+                    <ItemPicker items={items} value={item} onChange={setItem} invalid={item.trim() !== '' && !chosen} />
                 </label>
                 <label>
                     Quantity
@@ -65,12 +77,11 @@ function NewRequestForm({ shelter, onCreated }) {
                         ))}
                     </select>
                 </label>
-                {urgency === 'Critical' && (
-                    <label className="full">
-                        Why is this critical?
-                        <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. 40 elderly residents, no clean water since this morning" />
-                    </label>
-                )}
+                <label className="full">
+                    {level.ask}
+                    <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={level.example} />
+                </label>
+                <UrgencyHint item={chosen ? chosen.item : ''} quantity={quantity} reason={reason} urgency={urgency} onSwitch={setUrgency} />
                 <div className="actions full">
                     <button type="submit" className="icon-text"><Send size={16} /> Send request</button>
                 </div>

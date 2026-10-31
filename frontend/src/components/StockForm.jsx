@@ -51,7 +51,7 @@ function StockForm({ warehouse, inventory, onChanged }) {
             setQuantity('');
             setReason('');
             onChanged();
-        } catch (err) {
+        } catch {
             setErrors(['Could not reach the server']);
         }
     }

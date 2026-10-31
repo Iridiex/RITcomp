@@ -11,6 +11,9 @@ function readCsv(fileName) {
 }
 
 async function main() {
+    await knex.migrate.latest({ directory: path.join(__dirname, '../migrations') });
+    await knex('incidents').del();
+    await knex('shipment_notes').del();
     await knex('shipments').del();
     await knex('allocation_log').del();
     await knex('requests').del();

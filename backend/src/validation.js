@@ -1,12 +1,25 @@
 const URGENCIES = ['Critical', 'High', 'Moderate'];
 
-function validateNewRequest(body, shelterIds) {
+// Anything that is not a string (missing, number, object) counts as empty text
+function cleanText(value) {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function isBlank(value) {
+    return cleanText(value) === '';
+}
+
+function validateNewRequest(body, shelterIds, knownItems) {
     const errors = [];
     if (!shelterIds.includes(body.shelter_id)) { errors.push('Choose a shelter that exists'); }
-    if (!body.item || body.item.trim() === '') { errors.push('Enter an item'); }
+    if (isBlank(body.item)) {
+        errors.push('Enter an item');
+    } else if (knownItems && !knownItems.includes(cleanText(body.item).toLowerCase())) {
+        errors.push('Choose an item from the list. Warehouses do not stock ' + cleanText(body.item));
+    }
     if (!(Number.isInteger(Number(body.quantity)) && Number(body.quantity) > 0)) { errors.push('Quantity must be a whole number above 0'); }
     if (!URGENCIES.includes(body.urgency)) { errors.push('Urgency must be Critical, High or Moderate'); }
-    if (body.urgency === 'Critical' && (!body.reason || body.reason.trim() === '')) { errors.push('Critical requests need a reason'); }
+    if (isBlank(body.reason)) { errors.push('Say why you need this'); }
     return errors;
 }
 
@@ -20,7 +33,7 @@ function isValidCoordinate(value, limit) {
 // Used for both shelters and warehouses; only shelters need a priority
 function validateSite(body, { needsPriority }) {
     const errors = [];
-    if (!body.name || body.name.trim() === '') { errors.push('Enter a name'); }
+    if (isBlank(body.name)) { errors.push('Enter a name'); }
     if (needsPriority && ![1, 2, 3].includes(Number(body.priority))) { errors.push('Priority must be 1, 2 or 3'); }
     if (!isValidCoordinate(body.latitude, 90) || !isValidCoordinate(body.longitude, 180)) { errors.push('Pick a location on the map'); }
     return errors;
@@ -29,9 +42,17 @@ function validateSite(body, { needsPriority }) {
 function validateStock(body, warehouseIds) {
     const errors = [];
     if (!warehouseIds.includes(body.warehouse_id)) { errors.push('Choose a warehouse that exists'); }
-    if (!body.item || body.item.trim() === '') { errors.push('Enter an item'); }
+    if (isBlank(body.item)) { errors.push('Enter an item'); }
     if (!(Number.isInteger(Number(body.quantity)) && Number(body.quantity) > 0)) { errors.push('Quantity must be a whole number above 0'); }
     return errors;
 }
 
-module.exports = { validateNewRequest, validateSite, validateStock, URGENCIES };
+function validateDriver(body) {
+    const errors = [];
+    if (isBlank(body.name)) { errors.push('Enter a name'); }
+    const phone = cleanText(body.phone);
+    if (phone && !/^\+?[0-9][0-9 ()-]{5,19}$/.test(phone)) { errors.push('Phone must be a number like 050-123-4567'); }
+    return errors;
+}
+
+module.exports = { validateNewRequest, validateSite, validateStock, validateDriver, cleanText, isBlank, URGENCIES };

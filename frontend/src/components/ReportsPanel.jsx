@@ -1,16 +1,16 @@
-import { withToken } from '../session';
-import { FileText, FileSpreadsheet, Braces, Download } from 'lucide-react';
+import { API, withToken } from '../session';
+import { FileText, FileSpreadsheet, Braces, Download, Gauge, Send, TrendingDown, ClipboardList } from 'lucide-react';
 import { useEffect, useState } from 'react';
-
-const API = 'http://localhost:3000/api';
 
 const STATUS_COLOURS = {
     Fulfilled: '#16a34a',
+    Allocated: '#2563eb',
     Partial: '#d97706',
     Unfulfilled: '#dc2626',
     Pending: '#9ca3af',
     'Awaiting review': '#3b82f6',
     Rejected: '#4b5563',
+    Cancelled: '#94a3b8',
 };
 
 const DOWNLOADS = [
@@ -41,11 +41,13 @@ function ReportsPanel({ requests }) {
 
     const breakdown = [
         ['Fulfilled', s.fulfilled],
+        ['Allocated', s.allocated],
         ['Partial', s.partial],
         ['Unfulfilled', s.unfulfilled],
         ['Pending', s.pending],
         ['Awaiting review', s.awaiting_review],
         ['Rejected', s.rejected],
+        ['Cancelled', s.cancelled],
     ].filter(([, n]) => n > 0);
 
     const byItem = {};
@@ -63,22 +65,18 @@ function ReportsPanel({ requests }) {
     return (
         <>
             <div className="report-stats">
-                <div className="stat">
-                    <div className="stat-value">{s.fill_rate}%</div>
-                    <div className="stat-label">Fill rate</div>
-                </div>
-                <div className="stat fulfilled">
-                    <div className="stat-value">{s.units_allocated}</div>
-                    <div className="stat-label">Units sent</div>
-                </div>
-                <div className="stat unfulfilled">
-                    <div className="stat-value">{unitsShort}</div>
-                    <div className="stat-label">Units short</div>
-                </div>
-                <div className="stat">
-                    <div className="stat-value">{s.total}</div>
-                    <div className="stat-label">Requests</div>
-                </div>
+                {[
+                    { label: 'Fill rate', value: `${s.fill_rate}%`, tone: 'allocated', icon: Gauge },
+                    { label: 'Units sent', value: s.units_allocated, tone: 'fulfilled', icon: Send },
+                    { label: 'Units short', value: unitsShort, tone: 'unfulfilled', icon: TrendingDown },
+                    { label: 'Requests', value: s.total, tone: 'total', icon: ClipboardList },
+                ].map((stat) => (
+                    <div key={stat.label} className={`stat tone-${stat.tone}`}>
+                        <span className="stat-icon"><stat.icon size={17} /></span>
+                        <div className="stat-value">{stat.value}</div>
+                        <div className="stat-label">{stat.label}</div>
+                    </div>
+                ))}
             </div>
 
             <section className="card">
@@ -117,24 +115,26 @@ function ReportsPanel({ requests }) {
                 {shortages.length === 0 ? (
                     <p className="muted">No shortages. Every processed request was filled.</p>
                 ) : (
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Item</th><th>Requests affected</th><th>Requested</th><th>Sent</th><th>Still needed</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {shortages.map((row) => (
-                                <tr key={row.item}>
-                                    <td>{row.item}</td>
-                                    <td>{row.requests}</td>
-                                    <td>{row.requested}</td>
-                                    <td>{row.sent}</td>
-                                    <td className="out-of-stock">{row.short}</td>
+                    <div className="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Item</th><th>Requests affected</th><th>Requested</th><th>Sent</th><th>Still needed</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {shortages.map((row) => (
+                                    <tr key={row.item}>
+                                        <td>{row.item}</td>
+                                        <td>{row.requests}</td>
+                                        <td>{row.requested}</td>
+                                        <td>{row.sent}</td>
+                                        <td className="out-of-stock">{row.short}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </section>
 

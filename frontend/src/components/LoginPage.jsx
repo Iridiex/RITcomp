@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { LogIn, ClipboardList, Building2, Warehouse, Truck } from 'lucide-react';
 import { API } from '../session';
+import PasswordInput from './PasswordInput';
+import Logo from './Logo';
 
 const DEMO = [
     { role: 'Coordinator', username: 'coordinator', password: 'relief2026', icon: ClipboardList },
@@ -32,7 +34,7 @@ function LoginPage({ onLogin, notice }) {
                 return;
             }
             onLogin({ token: data.token, user: data.user });
-        } catch (err) {
+        } catch {
             setError('Could not reach the server. Is the backend running?');
             setBusy(false);
         }
@@ -41,9 +43,10 @@ function LoginPage({ onLogin, notice }) {
     return (
         <div className="login-page">
             <div className="login-brand">
-                <div className="brand-mark">RD</div>
-                <h1>Relief dispatch</h1>
-                <p>
+                <Logo size={88} className="brand-mark" />
+                <h1>Relief Dispatch</h1>
+                <p className="login-tagline">Relief supplies, tracked from request to arrival.</p>
+                <p className="login-about">
                     Shelters request supplies, coordinators approve and dispatch, warehouses manage stock
                     and drivers deliver, with every item tracked from request to arrival.
                 </p>
@@ -62,7 +65,7 @@ function LoginPage({ onLogin, notice }) {
                         </label>
                         <label>
                             Password
-                            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+                            <PasswordInput label="Password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
                         </label>
                         {error && <p className="errors">{error}</p>}
                         <button type="submit" className="icon-text login-submit" disabled={busy}>

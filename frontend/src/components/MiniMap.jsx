@@ -7,8 +7,9 @@ function Fit({ points }) {
     const map = useMap();
     const key = JSON.stringify(points);
     useEffect(() => {
-        if (points.length === 1) map.setView(points[0], 14);
-        else if (points.length > 1) map.fitBounds(points, { padding: [30, 30] });
+        const fit = JSON.parse(key);
+        if (fit.length === 1) map.setView(fit[0], 14);
+        else if (fit.length > 1) map.fitBounds(fit, { padding: [30, 30] });
     }, [key, map]);
     return null;
 }

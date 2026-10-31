@@ -81,18 +81,38 @@ test('a request is only Fulfilled once everything has arrived', async () => {
     expect(saved.status).toBe('Fulfilled');
 });
 
-test('failed delivery returns stock and sends a replacement', async () => {
+test('failed delivery sends the driver back to the warehouse and a replacement out straight away', async () => {
     await request(app).patch('/api/shipments/SHP-002/pickup').set('Authorization', AUTH).send({});
     const noReason = await request(app).patch('/api/shipments/SHP-002/fail').set('Authorization', AUTH).send({});
     expect(noReason.status).toBe(400);
 
     const res = await request(app).patch('/api/shipments/SHP-002/fail').set('Authorization', AUTH).send({ reason: 'Road closed by flooding' });
     expect(res.status).toBe(200);
-    expect(res.body.status).toBe('Returned');
+    expect(res.body.status).toBe('Returning');
     expect(res.body.replacements).toEqual(['SHP-005']);
 
-    expect(await stockOf('blankets')).toBe(30);
+    const replacement = (await getShipments()).find((s) => s.shipment_id === 'SHP-005');
+    expect(replacement.driver_id).toBe('DR-1');
     expect((await getRequest('RQ-002')).status).toBe('Allocated');
+
+    expect(await stockOf('blankets')).toBe(10);
+});
+
+test('returned items only go back into stock once the driver drops them off', async () => {
+    const early = await request(app).patch('/api/shipments/SHP-005/return').set('Authorization', AUTH).send({});
+    expect(early.status).toBe(400);
+
+    const res = await request(app).patch('/api/shipments/SHP-002/return').set('Authorization', AUTH)
+        .send({ damaged: 2, damage_note: 'Got soaked on the way back' });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('Returned');
+    expect(res.body.returned).toBe(18);
+    expect(res.body.returned_at).toBeTruthy();
+    expect(await stockOf('blankets')).toBe(28);
+
+    const again = await request(app).patch('/api/shipments/SHP-002/return').set('Authorization', AUTH).send({});
+    expect(again.status).toBe(400);
+    expect(await stockOf('blankets')).toBe(28);
 });
 
 test('damage with no stock left waits, then fills itself when stock arrives', async () => {
@@ -120,5 +140,5 @@ test('stock never goes negative', async () => {
 
 test('a driver only sees their own shipments', async () => {
     const res = await request(app).get('/api/shipments?driver_id=DR-2').set('Authorization', AUTH);
-    expect(res.body.map((s) => s.shipment_id)).toEqual(['SHP-002', 'SHP-004', 'SHP-005']);
+    expect(res.body.map((s) => s.shipment_id)).toEqual(['SHP-002', 'SHP-004', 'SHP-006']);
 });

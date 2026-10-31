@@ -1,5 +1,5 @@
 const knex = require('../db');
-const { validateStock } = require('../validation');
+const { validateStock, cleanText } = require('../validation');
 const { dispatch } = require('./allocationService');
 
 async function logMovement(trx, warehouseId, item, change, reason, byName) {
@@ -25,34 +25,38 @@ async function addToStock(trx, warehouseId, item, quantity, reason = 'Returned f
     return id;
 }
 
+async function sendToWaiting(trx, item) {
+    const waiting = await trx('requests').where({ item }).whereIn('status', ['Partial', 'Unfulfilled']);
+    if (waiting.length === 0) return [];
+    const { shipments } = await dispatch(trx, waiting, `REPLACE-${Date.now()}`);
+    return shipments.map((s) => s.shipment_id);
+}
+
 async function addStock(body) {
+    body = body || {};
     const warehouses = await knex('warehouses').select('warehouse_id');
     const errors = validateStock(body, warehouses.map((w) => w.warehouse_id));
     if (errors.length > 0) {
         return { errors };
     }
 
-    const item = body.item.trim().toLowerCase();
-    const reason = (body.reason && body.reason.trim()) || 'Stock received';
+    const item = cleanText(body.item).toLowerCase();
+    const reason = cleanText(body.reason) || 'Stock received';
 
     return knex.transaction(async (trx) => {
         const id = await addToStock(trx, body.warehouse_id, item, Number(body.quantity), reason, body.by_name);
 
-        let replacements = [];
-        const waiting = await trx('requests').where({ item }).whereIn('status', ['Partial', 'Unfulfilled']);
-        if (waiting.length > 0) {
-            const result = await dispatch(trx, waiting, `REPLACE-${Date.now()}`);
-            replacements = result.shipments.map((s) => s.shipment_id);
-        }
-
+        const replacements = await sendToWaiting(trx, item);
         const row = await trx('inventory').where({ id }).first();
         return { row: { ...row, replacements } };
     });
 }
 
 async function removeStock(body) {
+    body = body || {};
     const errors = [];
-    const item = body.item ? String(body.item).trim().toLowerCase() : '';
+    const item = cleanText(body.item).toLowerCase();
+    const reason = cleanText(body.reason);
     const quantity = Number(body.quantity);
     const row = item ? await knex('inventory').where({ warehouse_id: body.warehouse_id, item }).first() : null;
 
@@ -66,7 +70,7 @@ async function removeStock(body) {
     } else if (row && quantity > row.quantity) {
         errors.push(`Only ${row.quantity} ${item} in stock`);
     }
-    if (!body.reason || String(body.reason).trim() === '') {
+    if (!reason) {
         errors.push('Give a reason for removing stock');
     }
     if (errors.length > 0) {
@@ -76,7 +80,7 @@ async function removeStock(body) {
     return knex.transaction(async (trx) => {
         const newQuantity = row.quantity - quantity;
         await trx('inventory').where({ id: row.id }).update({ quantity: newQuantity });
-        await logMovement(trx, body.warehouse_id, item, -quantity, String(body.reason).trim(), body.by_name);
+        await logMovement(trx, body.warehouse_id, item, -quantity, reason, body.by_name);
         return { row: { ...row, quantity: newQuantity } };
     });
 }
@@ -89,4 +93,4 @@ async function listMovements(warehouseId) {
     return query;
 }
 
-module.exports = { addStock, addToStock, removeStock, listMovements };
+module.exports = { addStock, addToStock, sendToWaiting, removeStock, listMovements };

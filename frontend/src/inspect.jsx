@@ -1,6 +1,5 @@
-import { createContext, useContext, useState } from 'react';
-
-const InspectContext = createContext(null);
+import { useState } from 'react';
+import { InspectContext, useInspect } from './inspectContext';
 
 export function InspectProvider({ data, children }) {
     const [stack, setStack] = useState([]);
@@ -23,10 +22,6 @@ export function InspectProvider({ data, children }) {
     };
 
     return <InspectContext.Provider value={value}>{children}</InspectContext.Provider>;
-}
-
-export function useInspect() {
-    return useContext(InspectContext);
 }
 
 export function IdLink({ type, id, label, chip }) {

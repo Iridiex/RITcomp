@@ -18,6 +18,7 @@ beforeAll(async () => {
         { warehouse_id: 'WH-1', name: 'Depot One', latitude: 25.1, longitude: 55.2 },
         { warehouse_id: 'WH-2', name: 'Depot Two', latitude: 25.2, longitude: 55.3 },
     ]);
+    await knex('inventory').insert({ warehouse_id: 'WH-1', item: 'blankets', quantity: 40 });
     await knex('drivers').insert([
         { driver_id: 'DR-1', name: 'Ahmed', phone: '050-000-0001' },
         { driver_id: 'DR-2', name: 'Priya', phone: '050-000-0002' },
@@ -78,7 +79,7 @@ test('a shelter only sees its own requests', async () => {
 test('a shelter request is forced to its own shelter and goes to review', async () => {
     const token = await login('sh01');
     const res = await request(app).post('/api/requests').set('Authorization', 'Bearer ' + token)
-        .send({ shelter_id: 'SH-02', item: 'blankets', quantity: 20, urgency: 'High' });
+        .send({ shelter_id: 'SH-02', item: 'blankets', quantity: 20, urgency: 'High', reason: 'Cold nights' });
     expect(res.status).toBe(201);
     expect(res.body.shelter_id).toBe('SH-01');
     expect(res.body.status).toBe('Awaiting review');

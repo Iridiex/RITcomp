@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import LocationPicker from './LocationPicker';
+import LoginFields from './LoginFields';
+import { API } from '../session';
+import { NO_LOGIN, loginNote } from '../accounts';
 
-const API = 'http://localhost:3000/api';
-
-function SiteForm({ kind, site, otherSites, onSaved, onCancel }) {
+function SiteForm({ kind, site, currentLogin, otherSites, onSaved, onCancel }) {
     const isShelter = kind === 'shelter';
     const idField = isShelter ? 'shelter_id' : 'warehouse_id';
     const label = isShelter ? 'shelter' : 'warehouse';
@@ -13,6 +14,7 @@ function SiteForm({ kind, site, otherSites, onSaved, onCancel }) {
     const [priority, setPriority] = useState(editing && site.priority ? String(site.priority) : '2');
     const [latitude, setLatitude] = useState(editing ? Number(site.latitude) : '');
     const [longitude, setLongitude] = useState(editing ? Number(site.longitude) : '');
+    const [login, setLogin] = useState(NO_LOGIN);
     const [errors, setErrors] = useState([]);
 
     async function handleSubmit(e) {
@@ -20,7 +22,7 @@ function SiteForm({ kind, site, otherSites, onSaved, onCancel }) {
         setErrors([]);
         const path = isShelter ? 'shelters' : 'warehouses';
         const url = editing ? `${API}/${path}/${site[idField]}` : `${API}/${path}`;
-        const body = { name, latitude, longitude };
+        const body = { name, latitude, longitude, login };
         if (isShelter) body.priority = Number(priority);
 
         try {
@@ -34,15 +36,14 @@ function SiteForm({ kind, site, otherSites, onSaved, onCancel }) {
                 setErrors(data.errors || [data.error]);
                 return;
             }
-            onSaved(`${data[idField]} ${data.name} ${editing ? 'updated' : 'registered'}`);
-        } catch (err) {
+            onSaved(`${data[idField]} ${data.name} ${editing ? 'updated' : 'registered'}.${loginNote(login, data.username)}`);
+        } catch {
             setErrors(['Could not reach the server']);
         }
     }
 
     return (
         <form className="form" onSubmit={handleSubmit}>
-            <h3 className="full form-title">{editing ? `Edit ${site[idField]}` : `Register a new ${label}`}</h3>
 
             <label>
                 Name
@@ -71,6 +72,8 @@ function SiteForm({ kind, site, otherSites, onSaved, onCancel }) {
                     }}
                 />
             </div>
+
+            <LoginFields current={currentLogin} value={login} onChange={setLogin} />
 
             {errors.length > 0 && (
                 <ul className="errors full">

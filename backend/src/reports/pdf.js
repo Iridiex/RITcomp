@@ -67,7 +67,7 @@ function writePdf(report, stream) {
     const s = report.summary;
     const generated = new Date(report.generated_at).toLocaleString('en-GB', { timeZone: 'Asia/Dubai' });
 
-    doc.font('Helvetica-Bold').fontSize(18).text('Relief dispatch report');
+    doc.font('Helvetica-Bold').fontSize(18).text('Relief Dispatch report');
     doc.font('Helvetica').fontSize(10).fillColor('#6b7280').text('Generated ' + generated + ' (Dubai time)');
     doc.moveDown();
 
@@ -75,7 +75,7 @@ function writePdf(report, stream) {
     doc.font('Helvetica').fontSize(10).fillColor('#111827');
     doc.text('Requests: ' + s.total + '   Fulfilled: ' + s.fulfilled + '   Partial: ' + s.partial +
         '   Unfulfilled: ' + s.unfulfilled + '   Pending: ' + s.pending +
-        '   Awaiting review: ' + s.awaiting_review + '   Rejected: ' + s.rejected);
+        '   Awaiting review: ' + s.awaiting_review + '   Rejected: ' + s.rejected + '   Cancelled: ' + s.cancelled);
     doc.text('Units requested: ' + s.units_requested + '   Units sent: ' + s.units_allocated +
         '   Fill rate: ' + s.fill_rate + '%');
     doc.moveDown();

@@ -57,64 +57,76 @@ function LocationPicker({ latitude, longitude, onPick, otherSites = [] }) {
     const [suggestions, setSuggestions] = useState([]);
     const [open, setOpen] = useState(false);
     const [target, setTarget] = useState(null);
-    const [placeName, setPlaceName] = useState('');
-    const [searchError, setSearchError] = useState('');
-    const chosenName = useRef(null);
     const hasPin = latitude !== '' && latitude !== null && latitude !== undefined;
+    const [placeName, setPlaceName] = useState(hasPin ? 'Finding place name...' : '');
+    const [searchError, setSearchError] = useState('');
+    // Set when the name for the next pin is already known (picked from search), so no lookup is needed
+    const knownName = useRef(null);
+    const searchText = query.trim();
+    const shownSuggestions = open && searchText.length >= 3 ? suggestions : [];
 
     useEffect(() => {
-        const text = query.trim();
-        if (!open || text.length < 3) {
-            setSuggestions([]);
-            return;
-        }
+        if (!open || searchText.length < 3) return;
+        let cancelled = false;
         const timer = setTimeout(async () => {
+            let found;
             try {
-                setSuggestions(await findPlaces(text, 5));
-            } catch (err) {
-                setSuggestions([]);
+                found = await findPlaces(searchText, 5);
+            } catch {
+                found = [];
             }
+            if (!cancelled) setSuggestions(found);
         }, 300);
-        return () => clearTimeout(timer);
-    }, [query, open]);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [searchText, open]);
 
     useEffect(() => {
-        if (!hasPin) {
-            setPlaceName('');
-            setQuery('');
+        if (!hasPin) return;
+        if (knownName.current) {
+            knownName.current = null;
             return;
         }
-        if (chosenName.current) {
-            setPlaceName(chosenName.current);
-            chosenName.current = null;
-            return;
-        }
-        setPlaceName('Finding place name...');
+        let cancelled = false;
         const timer = setTimeout(async () => {
+            let name;
             try {
-                const name = (await nameOfSpot(latitude, longitude)) || 'Unnamed spot';
-                setPlaceName(name);
-                setQuery(name);
-            } catch (err) {
-                setPlaceName('');
+                name = (await nameOfSpot(latitude, longitude)) || 'Unnamed spot';
+            } catch {
+                name = '';
             }
+            if (cancelled) return;
+            setPlaceName(name);
+            if (name) setQuery(name);
         }, 300);
-        return () => clearTimeout(timer);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
     }, [latitude, longitude, hasPin]);
 
+    function pickOnMap(lat, lng) {
+        setPlaceName('Finding place name...');
+        onPick(lat, lng);
+    }
+
     function choose(place) {
-        setQuery(fullName(place));
+        const name = fullName(place);
+        setQuery(name);
+        setPlaceName(name);
         setOpen(false);
         setSuggestions([]);
         setSearchError('');
         setTarget([place.lat, place.lng]);
-        chosenName.current = fullName(place);
+        knownName.current = name;
         onPick(place.lat, place.lng);
     }
 
     async function searchNow() {
-        if (suggestions.length > 0) {
-            choose(suggestions[0]);
+        if (shownSuggestions.length > 0) {
+            choose(shownSuggestions[0]);
             return;
         }
         const text = query.trim();
@@ -126,12 +138,14 @@ function LocationPicker({ latitude, longitude, onPick, otherSites = [] }) {
                 return;
             }
             choose(places[0]);
-        } catch (err) {
+        } catch {
             setSearchError('Search is unavailable right now');
         }
     }
 
     function clearPin() {
+        setPlaceName('');
+        setQuery('');
         onPick('', '');
     }
 
@@ -157,9 +171,9 @@ function LocationPicker({ latitude, longitude, onPick, otherSites = [] }) {
                         }}
                         placeholder="Search a place, e.g. Karama"
                     />
-                    {open && suggestions.length > 0 && (
+                    {shownSuggestions.length > 0 && (
                         <ul className="suggestions">
-                            {suggestions.map((place, i) => (
+                            {shownSuggestions.map((place, i) => (
                                 <li
                                     key={`${place.lat},${place.lng},${i}`}
                                     onMouseDown={(e) => {
@@ -200,7 +214,7 @@ function LocationPicker({ latitude, longitude, onPick, otherSites = [] }) {
                         )}
                     </CircleMarker>
                 )}
-                <ClickToPick onPick={onPick} />
+                <ClickToPick onPick={pickOnMap} />
                 <FlyTo target={target} />
             </MapContainer>
 

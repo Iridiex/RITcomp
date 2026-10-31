@@ -1,21 +1,28 @@
 const knex = require('../db');
-const { validateSite } = require('../validation');
+const { validateSite, cleanText } = require('../validation');
+const { ACTIVE } = require('./allocationService');
+const { loginFor, checkLogin, saveLogin } = require('./userService');
+const { nextId } = require('../ids');
 
+// `history` lists every other table that keeps this site's ID
 const SITES = {
-    shelter: { table: 'shelters', idColumn: 'shelter_id', prefix: 'SH-', pad: 2, needsPriority: true },
-    warehouse: { table: 'warehouses', idColumn: 'warehouse_id', prefix: 'WH-', pad: 1, needsPriority: false },
+    shelter: {
+        table: 'shelters', idColumn: 'shelter_id', prefix: 'SH-', pad: 2, needsPriority: true,
+        history: ['requests', 'users'],
+    },
+    warehouse: {
+        table: 'warehouses', idColumn: 'warehouse_id', prefix: 'WH-', pad: 1, needsPriority: false,
+        history: ['inventory', 'shipments', 'allocation_log', 'stock_movements', 'users'],
+    },
 };
 
-async function nextId(site) {
-    const rows = await knex(site.table).select(site.idColumn);
-    const numbers = rows.map((r) => Number(r[site.idColumn].replace(site.prefix, '')) || 0);
-    const next = Math.max(0, ...numbers) + 1;
-    return site.prefix + String(next).padStart(site.pad, '0');
+function newSiteId(site) {
+    return nextId(site.prefix, site.pad, [site.table, ...site.history].map((table) => [table, site.idColumn]));
 }
 
 function cleanSite(body, site) {
     const row = {
-        name: body.name.trim(),
+        name: cleanText(body.name),
         latitude: Number(body.latitude),
         longitude: Number(body.longitude),
     };
@@ -24,23 +31,37 @@ function cleanSite(body, site) {
 }
 
 async function createSite(kind, body) {
+    body = body || {};
     const site = SITES[kind];
-    const errors = validateSite(body, site);
+    const errors = [...validateSite(body, site), ...(await checkLogin(body.login, null))];
     if (errors.length > 0) { return { errors }; }
-    const row = { [site.idColumn]: await nextId(site), ...cleanSite(body, site) };
-    await knex(site.table).insert(row);
-    return { site: row };
+
+    const row = { [site.idColumn]: await newSiteId(site), ...cleanSite(body, site) };
+    let username = null;
+    await knex.transaction(async (trx) => {
+        await trx(site.table).insert(row);
+        username = await saveLogin(trx, body.login, null, { name: row.name, role: kind, [site.idColumn]: row[site.idColumn] });
+    });
+    return { site: { ...row, username } };
 }
 
 async function updateSite(kind, id, body) {
+    body = body || {};
     const site = SITES[kind];
     const existing = await knex(site.table).where({ [site.idColumn]: id }).first();
     if (!existing) { return { notFound: true }; }
-    const errors = validateSite(body, site);
+    const current = await loginFor(site.idColumn, id);
+    const errors = [...validateSite(body, site), ...(await checkLogin(body.login, current))];
     if (errors.length > 0) { return { errors }; }
+
     const changes = cleanSite(body, site);
-    await knex(site.table).where({ [site.idColumn]: id }).update(changes);
-    return { site: { ...existing, ...changes } };
+    let username = null;
+    await knex.transaction(async (trx) => {
+        await trx(site.table).where({ [site.idColumn]: id }).update(changes);
+        await trx('users').where({ [site.idColumn]: id }).update({ name: changes.name });
+        username = await saveLogin(trx, body.login, current, { name: changes.name, role: kind, [site.idColumn]: id });
+    });
+    return { site: { ...existing, ...changes, username: username || (current ? current.username : null) } };
 }
 
 async function deleteSite(kind, id) {
@@ -58,12 +79,17 @@ async function deleteSite(kind, id) {
         if (Number(stock.total) > 0) {
             return { errors: [id + ' still holds ' + stock.total + ' units of stock and cannot be deleted'] };
         }
+        const open = await knex('shipments').where({ warehouse_id: id }).whereIn('status', ACTIVE).count({ n: '*' }).first();
+        if (Number(open.n) > 0) {
+            return { errors: [id + ' has ' + open.n + ' shipment(s) still to deliver and cannot be deleted'] };
+        }
     }
 
     await knex.transaction(async (trx) => {
         if (kind === 'warehouse') {
             await trx('inventory').where({ warehouse_id: id }).del();
         }
+        await trx('users').where({ [site.idColumn]: id }).del();
         await trx(site.table).where({ [site.idColumn]: id }).del();
     });
     return { site: existing };

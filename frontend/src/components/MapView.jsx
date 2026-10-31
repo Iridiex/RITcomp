@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css';
 
 // Shelter pin colour by priority (1 = most important)
 const PRIORITY_COLOURS = { 1: '#dc2626', 2: '#d97706', 3: '#6b7280' };
-const OPEN_STATUSES = ['Awaiting review', 'Pending', 'Partial'];
+const OPEN_STATUSES = ['Awaiting review', 'Pending', 'Partial', 'Unfulfilled'];
 
 function MapView({ shelters, warehouses, requests, inventory }) {
     const openRequests = (id) =>
