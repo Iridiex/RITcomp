@@ -1,23 +1,60 @@
 import { useEffect, useState } from 'react';
+import Sidebar, { PAGES } from './components/Sidebar';
+import MapView from './components/MapView';
+import DashboardSide from './components/DashboardSide';
+import ReviewQueue from './components/ReviewQueue';
+import NewRequestForm from './components/NewRequestForm';
+import RequestsTable from './components/RequestsTable';
+import AddStockForm from './components/AddStockForm';
+import InventoryTable from './components/InventoryTable';
+import SitesPanel from './components/SitesPanel';
+import AllocationLog from './components/AllocationLog';
+import ShipmentsPanel from './components/ShipmentsPanel';
+import DriverView from './components/DriverView';
+import ReportsPanel from './components/ReportsPanel';
 
 const API = 'http://localhost:3000/api';
 
+const SUBTITLES = {
+    dashboard: 'Overview of requests, stock and locations',
+    requests: 'Review shelter requests and add new ones',
+    inventory: 'Stock held in each warehouse',
+    sites: 'Register, move or remove shelters and warehouses',
+    allocation: 'Run the allocation engine and see what was sent',
+    shipments: 'Assign drivers and track every delivery',
+    driver: 'What a driver sees on their phone',
+    reports: 'Export fulfilled and unfulfilled requests',
+};
+
+function startPage() {
+    const hash = window.location.hash.replace('#', '');
+    return PAGES.some((p) => p.id === hash) ? hash : 'dashboard';
+}
+
 function App() {
+    const [page, setPage] = useState(startPage);
     const [requests, setRequests] = useState([]);
     const [inventory, setInventory] = useState([]);
     const [log, setLog] = useState([]);
+    const [shelters, setShelters] = useState([]);
+    const [warehouses, setWarehouses] = useState([]);
+    const [shipments, setShipments] = useState([]);
+    const [drivers, setDrivers] = useState([]);
     const [message, setMessage] = useState('');
+    const [statusFilter, setStatusFilter] = useState('All');
 
     async function loadAll() {
         try {
-            const res = await fetch(`${API}/requests`);
-            setRequests(await res.json());
-
-            const invRes = await fetch(`${API}/inventory`);
-            setInventory(await invRes.json());
-
-            const logRes = await fetch(`${API}/allocations/log`);
-            setLog(await logRes.json());
+            const urls = ['requests', 'inventory', 'allocations/log', 'shelters', 'warehouses', 'shipments', 'drivers'];
+            const responses = await Promise.all(urls.map((u) => fetch(`${API}/${u}`)));
+            const [req, inv, lg, sh, wh, shp, drv] = await Promise.all(responses.map((r) => r.json()));
+            setRequests(req);
+            setInventory(inv);
+            setLog(lg);
+            setShelters(sh);
+            setWarehouses(wh);
+            setShipments(shp);
+            setDrivers(drv);
         } catch (err) {
             setMessage('Could not reach the server. Is the backend running?');
         }
@@ -31,18 +68,30 @@ function App() {
                 setMessage(data.error || 'Allocation failed');
                 return;
             }
-            setMessage(`Allocation finished: ${data.fulfilled} fulfilled, ${data.partial} partial, ${data.unfulfilled} unfulfilled`);
+            setMessage(
+                `This run: ${data.fulfilled} fulfilled, ${data.partial} partial, ${data.unfulfilled} unfulfilled · ${data.shipments} shipment(s) created`
+            );
             loadAll();
         } catch (err) {
             setMessage('Could not reach the server. Is the backend running?');
         }
     }
 
+    function navigate(next) {
+        setPage(next);
+        setMessage('');
+        window.location.hash = next;
+    }
+
+    function openRequests(status) {
+        setStatusFilter(status);
+        navigate('requests');
+    }
+
     useEffect(() => {
         loadAll();
     }, []);
 
-    // Summary cards: count requests by status
     const count = (s) => requests.filter((r) => r.status === s).length;
     const stats = [
         { label: 'Requests', value: requests.length, cls: '' },
@@ -51,96 +100,91 @@ function App() {
         { label: 'Partial', value: count('Partial'), cls: 'partial' },
         { label: 'Unfulfilled', value: count('Unfulfilled'), cls: 'unfulfilled' },
     ];
+    const badges = {
+        requests: count('Awaiting review'),
+        shipments: shipments.filter((s) => s.status === 'Ready' && !s.driver_id).length,
+    };
+    const title = PAGES.find((p) => p.id === page).label;
+    const showRunButton = page === 'dashboard' || page === 'allocation';
 
     return (
-        <div>
-            <header className="header">
-                <div>
-                    <h1>Relief dispatch</h1>
-                    <p className="subtitle">Emergency supply allocation for shelters</p>
-                </div>
-                <button onClick={runAllocation}>Run allocation</button>
-            </header>
+        <div className="layout">
+            <Sidebar page={page} onNavigate={navigate} badges={badges} />
 
-            {message && <p className="message">{message}</p>}
-
-            <div className="stats">
-                {stats.map((s) => (
-                    <div key={s.label} className={`stat ${s.cls}`}>
-                        <div className="stat-value">{s.value}</div>
-                        <div className="stat-label">{s.label}</div>
+            <main className="content">
+                <header className="header">
+                    <div>
+                        <h1>{title}</h1>
+                        <p className="subtitle">{SUBTITLES[page]}</p>
                     </div>
-                ))}
-            </div>
+                    {showRunButton && <button onClick={runAllocation}>Run allocation</button>}
+                </header>
 
-            <section className="card">
-                <h2>Requests</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th><th>Shelter</th><th>Item</th><th>Qty</th>
-                            <th>Urgency</th><th>Status</th><th>Sent</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {requests.map((r) => (
-                            <tr key={r.request_id}>
-                                <td>{r.request_id}</td>
-                                <td>{r.shelter_id}</td>
-                                <td>{r.item}</td>
-                                <td>{r.quantity}</td>
-                                <td><span className={`badge ${r.urgency.toLowerCase()}`}>{r.urgency}</span></td>
-                                <td><span className={`badge ${r.status.toLowerCase()}`}>{r.status}</span></td>
-                                <td>{r.quantity_allocated}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </section>
+                {message && <p className="message">{message}</p>}
 
-            <section className="card">
-                <h2>Inventory</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Warehouse</th><th>Item</th><th>Qty</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {inventory.map((row) => (
-                            <tr key={row.id}>
-                                <td>{row.warehouse_id}</td>
-                                <td>{row.item}</td>
-                                <td>{row.quantity}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </section>
+                {page === 'dashboard' && (
+                    <>
+                        <div className="stats">
+                            {stats.map((s) => (
+                                <div
+                                    key={s.label}
+                                    className={`stat clickable ${s.cls}`}
+                                    onClick={() => openRequests(s.label === 'Requests' ? 'All' : s.label)}
+                                >
+                                    <div className="stat-value">{s.value}</div>
+                                    <div className="stat-label">{s.label}</div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="dash-grid">
+                            <MapView shelters={shelters} warehouses={warehouses} requests={requests} inventory={inventory} />
+                            <DashboardSide
+                                requests={requests}
+                                shelters={shelters}
+                                inventory={inventory}
+                                warehouses={warehouses}
+                                onOpenRequests={openRequests}
+                            />
+                        </div>
+                    </>
+                )}
 
-            <section className="card">
-                <h2>Allocation log</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Run</th><th>Request</th><th>Warehouse</th>
-                            <th>Sent</th><th>Result</th><th>Reason</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {log.map((row) => (
-                            <tr key={row.id}>
-                                <td>{row.run_id}</td>
-                                <td>{row.request_id}</td>
-                                <td>{row.warehouse_id || '-'}</td>
-                                <td>{row.quantity_sent}</td>
-                                <td><span className={`badge ${row.result.toLowerCase()}`}>{row.result}</span></td>
-                                <td>{row.reason || ''}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </section>
+                {page === 'requests' && (
+                    <>
+                        <ReviewQueue requests={requests} shelters={shelters} onChanged={loadAll} />
+                        <NewRequestForm shelters={shelters} onCreated={loadAll} />
+                        <RequestsTable
+                            requests={requests}
+                            shelters={shelters}
+                            filter={statusFilter}
+                            onFilterChange={setStatusFilter}
+                        />
+                    </>
+                )}
+
+                {page === 'inventory' && (
+                    <>
+                        <AddStockForm warehouses={warehouses} onAdded={loadAll} />
+                        <InventoryTable inventory={inventory} warehouses={warehouses} />
+                    </>
+                )}
+
+                {page === 'sites' && (
+                    <SitesPanel shelters={shelters} warehouses={warehouses} onChanged={loadAll} />
+                )}
+
+                {page === 'allocation' && <AllocationLog log={log} />}
+
+                {page === 'shipments' && (
+                    <ShipmentsPanel shipments={shipments} drivers={drivers} onChanged={loadAll} />
+                )}
+
+                {page === 'driver' && (
+                    <DriverView drivers={drivers} shipments={shipments} onChanged={loadAll} />
+                )}
+
+                {page === 'reports' && <ReportsPanel requests={requests} />}
+            </main>
         </div>
     );
 }

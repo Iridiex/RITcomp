@@ -10,13 +10,15 @@ function readCsv(fileName) {
 }
 
 async function main() {
+    await knex('shipments').del();
     await knex('allocation_log').del();
     await knex('requests').del();
     await knex('inventory').del();
     await knex('shelters').del();
+    await knex('warehouses').del();
+    await knex('drivers').del();
 
-    const shelterRows = readCsv('shelters.csv');
-    const shelters = shelterRows.map((row) => ({
+    const shelters = readCsv('shelters.csv').map((row) => ({
         ...row,
         priority: Number(row.priority),
         latitude: Number(row.latitude),
@@ -24,16 +26,23 @@ async function main() {
     }));
     await knex('shelters').insert(shelters);
 
-    const inventoryRows = readCsv('inventory.csv');
-    const inventory = inventoryRows.map((row) => ({
+    const warehouses = readCsv('warehouses.csv').map((row) => ({
+        ...row,
+        latitude: Number(row.latitude),
+        longitude: Number(row.longitude),
+    }));
+    await knex('warehouses').insert(warehouses);
+
+    await knex('drivers').insert(readCsv('drivers.csv'));
+
+    const inventory = readCsv('inventory.csv').map((row) => ({
         ...row,
         quantity: Number(row.quantity),
         item: row.item.trim().toLowerCase(),
     }));
     await knex('inventory').insert(inventory);
 
-    const requestRows = readCsv('requests.csv');
-    const requests = requestRows.map((row) => ({
+    const requests = readCsv('requests.csv').map((row) => ({
         ...row,
         quantity: Number(row.quantity),
         item: row.item.trim().toLowerCase(),
