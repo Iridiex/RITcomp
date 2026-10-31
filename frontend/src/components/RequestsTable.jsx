@@ -1,3 +1,4 @@
+import { IdLink } from '../inspect';
 import { useState } from 'react';
 
 const FILTERS = ['All', 'Awaiting review', 'Pending', 'Fulfilled', 'Partial', 'Unfulfilled', 'Rejected'];
@@ -57,8 +58,8 @@ function RequestsTable({ requests, shelters, filter, onFilterChange }) {
                     <tbody>
                         {shown.map((r) => (
                             <tr key={r.request_id}>
-                                <td>{r.request_id}</td>
-                                <td>{nameOf(r.shelter_id)}</td>
+                                <td><IdLink type="request" id={r.request_id} /></td>
+                                <td><IdLink type="shelter" id={r.shelter_id} label={nameOf(r.shelter_id)} /></td>
                                 <td>{r.item}</td>
                                 <td>{r.quantity}</td>
                                 <td><span className={`badge ${r.urgency.toLowerCase()}`}>{r.urgency}</span></td>

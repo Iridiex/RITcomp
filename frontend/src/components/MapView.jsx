@@ -1,3 +1,4 @@
+import { IdLink } from '../inspect';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -35,7 +36,7 @@ function MapView({ shelters, warehouses, requests, inventory }) {
                     >
                         <Popup>
                             <strong>{s.name}</strong><br />
-                            {s.shelter_id} · Priority {s.priority}<br />
+                            <IdLink type="shelter" id={s.shelter_id} /> · Priority {s.priority}<br />
                             Open requests: {openRequests(s.shelter_id).length}
                             <ul className="popup-list">
                                 {openRequests(s.shelter_id).map((r) => (
@@ -55,7 +56,7 @@ function MapView({ shelters, warehouses, requests, inventory }) {
                     >
                         <Popup>
                             <strong>{w.name}</strong><br />
-                            {w.warehouse_id}
+                            <IdLink type="warehouse" id={w.warehouse_id} />
                             <ul className="popup-list">
                                 {stockAt(w.warehouse_id).map((row) => (
                                     <li key={row.id}>{row.item}: {row.quantity}</li>

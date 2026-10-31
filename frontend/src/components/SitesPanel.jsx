@@ -1,6 +1,7 @@
+import { IdLink } from '../inspect';
 import { useState } from 'react';
 import SiteForm from './SiteForm';
-import { TrashIcon } from './Icons';
+import { Trash2 } from 'lucide-react';
 
 const API = 'http://localhost:3000/api';
 
@@ -97,7 +98,7 @@ function SitesPanel({ shelters, warehouses, onChanged }) {
                         <tbody>
                             {list.map((site) => (
                                 <tr key={site[idField]}>
-                                    <td>{site[idField]}</td>
+                                    <td><IdLink type={tab} id={site[idField]} /></td>
                                     <td>{site.name}</td>
                                     {isShelter && <td>{site.priority}</td>}
                                     <td>{Number(site.latitude).toFixed(4)}, {Number(site.longitude).toFixed(4)}</td>
@@ -110,7 +111,7 @@ function SitesPanel({ shelters, warehouses, onChanged }) {
                                         ) : (
                                             <div className="actions">
                                                 <button className="secondary small" onClick={() => { clearNotes(); setFormSite(site); }}>Edit</button>
-                                                <button className="danger-outline icon-button" title="Delete" aria-label={`Delete ${site.name}`} onClick={() => { clearNotes(); setConfirmId(site[idField]); }}><TrashIcon /></button>
+                                                <button className="danger-outline icon-button" title="Delete" aria-label={`Delete ${site.name}`} onClick={() => { clearNotes(); setConfirmId(site[idField]); }}><Trash2 size={18} /></button>
                                             </div>
                                         )}
                                     </td>

@@ -1,4 +1,5 @@
 const URGENCY_RANK = { Critical: 1, High: 2, Moderate: 3 };
+const WAITING = ['Pending', 'Partial', 'Unfulfilled'];
 
 function sortRequests(requests, shelters) {
     return [...requests].sort((a, b) => {
@@ -24,13 +25,9 @@ function orderWarehouses(inventory, item) {
 }
 
 function allocate(requests, shelters, inventory) {
-
-    const stock = inventory.map((row) => ({...row }));
-
-
-    const waiting = requests.filter((r) => r.status === 'Pending' || r.status === 'Partial');
+    const stock = inventory.map((row) => ({ ...row }));
+    const waiting = requests.filter((r) => WAITING.includes(r.status));
     const queue = sortRequests(waiting, shelters);
-
     const results = [];
 
     for (const request of queue) {
@@ -39,19 +36,16 @@ function allocate(requests, shelters, inventory) {
 
         for (const row of orderWarehouses(stock, request.item)) {
             if (needed === 0) break;
-
             const take = Math.min(needed, row.quantity);
             row.quantity = row.quantity - take;
             needed = needed - take;
             takes.push({ warehouse_id: row.warehouse_id, quantity: take });
-
         }
 
         const totalSent = request.quantity - needed;
-
         let status;
         if (needed === 0) {
-            status = 'Fulfilled';
+            status = 'Allocated';
         } else if (totalSent > 0) {
             status = 'Partial';
         } else {
@@ -65,16 +59,10 @@ function allocate(requests, shelters, inventory) {
             reason = `No ${request.item} in stock`;
         }
 
-        results.push({
-            request_id: request.request_id,
-            status: status,
-            quantity_allocated: totalSent,
-            takes: takes,
-            reason: reason,
-        });
+        results.push({ request_id: request.request_id, status, quantity_allocated: totalSent, takes, reason });
     }
 
     return { results, stock };
 }
 
-module.exports = { sortRequests, orderWarehouses, allocate };
+module.exports = { sortRequests, orderWarehouses, allocate, WAITING };

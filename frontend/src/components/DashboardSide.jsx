@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react';
 const PROCESSED = ['Fulfilled', 'Partial', 'Unfulfilled'];
 
 function DashboardSide({ requests, shelters, inventory, warehouses, onOpenRequests }) {
@@ -42,7 +43,7 @@ function DashboardSide({ requests, shelters, inventory, warehouses, onOpenReques
                         {awaiting > 0 && (
                             <li className="attention-item info" onClick={() => onOpenRequests('Awaiting review')}>
                                 <span><strong>{awaiting}</strong> waiting for review</span>
-                                <span className="go">Review →</span>
+                                <span className="go icon-text">Review <ArrowRight size={14} /></span>
                             </li>
                         )}
                         {criticalShort.map((r) => (

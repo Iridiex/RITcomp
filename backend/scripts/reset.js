@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const knex = require('knex')(require('../knexfile').development);
 const fs = require('fs');
 const path = require('path');
@@ -17,6 +18,8 @@ async function main() {
     await knex('shelters').del();
     await knex('warehouses').del();
     await knex('drivers').del();
+    await knex('users').del();
+    await knex('stock_movements').del();
 
     const shelters = readCsv('shelters.csv').map((row) => ({
         ...row,
@@ -34,6 +37,17 @@ async function main() {
     await knex('warehouses').insert(warehouses);
 
     await knex('drivers').insert(readCsv('drivers.csv'));
+
+    const users = readCsv('users.csv').map((row) => ({
+        username: row.username.toLowerCase(),
+        password_hash: bcrypt.hashSync(row.password, 10),
+        name: row.name,
+        role: row.role,
+        shelter_id: row.shelter_id || null,
+        warehouse_id: row.warehouse_id || null,
+        driver_id: row.driver_id || null,
+    }));
+    await knex('users').insert(users);
 
     const inventory = readCsv('inventory.csv').map((row) => ({
         ...row,

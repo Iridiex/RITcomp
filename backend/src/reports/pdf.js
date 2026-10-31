@@ -17,6 +17,15 @@ const INVENTORY_COLUMNS = [
     { key: 'quantity', label: 'Quantity', width: 60 },
 ];
 
+const DAMAGE_COLUMNS = [
+    { key: 'shipment_id', label: 'Shipment', width: 55 },
+    { key: 'request_id', label: 'Request', width: 55 },
+    { key: 'shelter_name', label: 'Shelter', width: 120 },
+    { key: 'item', label: 'Item', width: 75 },
+    { key: 'damaged', label: 'Damaged', width: 50 },
+    { key: 'note', label: 'What happened', width: 160 },
+];
+
 function drawTable(doc, columns, rows) {
     const left = doc.page.margins.left;
     let y = doc.y;
@@ -77,8 +86,11 @@ function writePdf(report, stream) {
     heading(doc, 'Unfulfilled and partial requests');
     drawTable(doc, REQUEST_COLUMNS, report.unfulfilled);
 
-    heading(doc, 'Still open (pending or awaiting review)');
+    heading(doc, 'Still open (pending, awaiting review or on the way)');
     drawTable(doc, REQUEST_COLUMNS, report.open);
+
+    heading(doc, 'Damaged, written off or returned');
+    drawTable(doc, DAMAGE_COLUMNS, report.damaged);
 
     heading(doc, 'Current inventory');
     drawTable(doc, INVENTORY_COLUMNS, report.inventory);

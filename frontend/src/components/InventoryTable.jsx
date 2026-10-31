@@ -1,3 +1,4 @@
+import { IdLink } from '../inspect';
 function InventoryTable({ inventory, warehouses }) {
     const nameOf = (id) => {
         const warehouse = warehouses.find((w) => w.warehouse_id === id);
@@ -16,7 +17,7 @@ function InventoryTable({ inventory, warehouses }) {
                 <tbody>
                     {inventory.map((row) => (
                         <tr key={row.id}>
-                            <td>{row.warehouse_id}: {nameOf(row.warehouse_id)}</td>
+                            <td><IdLink type="warehouse" id={row.warehouse_id} label={`${row.warehouse_id}: ${nameOf(row.warehouse_id)}`} /></td>
                             <td>{row.item}</td>
                             <td className={row.quantity === 0 ? 'out-of-stock' : ''}>{row.quantity}</td>
                         </tr>

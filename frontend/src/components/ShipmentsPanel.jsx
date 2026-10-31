@@ -1,7 +1,8 @@
+import { IdLink } from '../inspect';
 import { useState } from 'react';
 
 const API = 'http://localhost:3000/api';
-const FILTERS = ['All', 'Ready', 'In transit', 'Delivered'];
+const FILTERS = ['All', 'Ready', 'In transit', 'Delivered', 'Returned'];
 
 function ShipmentsPanel({ shipments, drivers, onChanged }) {
     const [filter, setFilter] = useState('All');
@@ -30,12 +31,16 @@ function ShipmentsPanel({ shipments, drivers, onChanged }) {
     const shown = shipments.filter((s) => filter === 'All' || s.status === filter);
     const countOf = (f) => (f === 'All' ? shipments.length : shipments.filter((s) => s.status === f).length);
     const unassigned = shipments.filter((s) => s.status === 'Ready' && !s.driver_id).length;
+    const replacements = shipments.filter((s) => s.run_id.startsWith('REPLACE') && s.status !== 'Delivered').length;
 
     return (
         <section className="card">
             <div className="panel-header">
                 <h2>Shipments</h2>
-                {unassigned > 0 && <span className="pill warn">{unassigned} waiting for a driver</span>}
+                <div className="actions">
+                    {replacements > 0 && <span className="pill info">{replacements} replacement(s) on the way</span>}
+                    {unassigned > 0 && <span className="pill warn">{unassigned} waiting for a driver</span>}
+                </div>
             </div>
 
             <div className="chips">
@@ -54,22 +59,33 @@ function ShipmentsPanel({ shipments, drivers, onChanged }) {
                 <table>
                     <thead>
                         <tr>
-                            <th>ID</th><th>Load</th><th>From</th><th>To</th>
+                            <th>Shipment</th><th>Load</th><th>From</th><th>To</th>
                             <th>Urgency</th><th>Driver</th><th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
                         {shown.map((s) => (
                             <tr key={s.shipment_id}>
-                                <td>{s.shipment_id}</td>
+                                <td>
+                                    <IdLink type="shipment" id={s.shipment_id} />
+                                    {s.run_id.startsWith('REPLACE') && <span className="tag">Replacement</span>}
+                                    <div className="id-line">for <IdLink type="request" id={s.request_id} /></div>
+                                </td>
                                 <td>
                                     {s.quantity} {s.item}
                                     {s.quantity_damaged > 0 && (
-                                        <div className="damage-note">{s.quantity_damaged} damaged: {s.damage_note}</div>
+                                        <div className="damage-note">{s.quantity_damaged} written off: {s.damage_note}</div>
                                     )}
+                                    {s.failure_reason && <div className="damage-note">Returned: {s.failure_reason}</div>}
                                 </td>
-                                <td>{s.warehouse_name}</td>
-                                <td>{s.shelter_name}</td>
+                                <td>
+                                    <IdLink type="warehouse" id={s.warehouse_id} chip />
+                                    <div>{s.warehouse_name}</div>
+                                </td>
+                                <td>
+                                    <IdLink type="shelter" id={s.shelter_id} chip />
+                                    <div>{s.shelter_name}</div>
+                                </td>
                                 <td><span className={`badge ${(s.urgency || '').toLowerCase()}`}>{s.urgency}</span></td>
                                 <td>
                                     {s.status === 'Ready' ? (

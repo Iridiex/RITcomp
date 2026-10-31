@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -59,6 +59,7 @@ function LocationPicker({ latitude, longitude, onPick, otherSites = [] }) {
     const [target, setTarget] = useState(null);
     const [placeName, setPlaceName] = useState('');
     const [searchError, setSearchError] = useState('');
+    const chosenName = useRef(null);
     const hasPin = latitude !== '' && latitude !== null && latitude !== undefined;
 
     useEffect(() => {
@@ -80,12 +81,20 @@ function LocationPicker({ latitude, longitude, onPick, otherSites = [] }) {
     useEffect(() => {
         if (!hasPin) {
             setPlaceName('');
+            setQuery('');
+            return;
+        }
+        if (chosenName.current) {
+            setPlaceName(chosenName.current);
+            chosenName.current = null;
             return;
         }
         setPlaceName('Finding place name...');
         const timer = setTimeout(async () => {
             try {
-                setPlaceName((await nameOfSpot(latitude, longitude)) || 'Unnamed spot');
+                const name = (await nameOfSpot(latitude, longitude)) || 'Unnamed spot';
+                setPlaceName(name);
+                setQuery(name);
             } catch (err) {
                 setPlaceName('');
             }
@@ -99,6 +108,7 @@ function LocationPicker({ latitude, longitude, onPick, otherSites = [] }) {
         setSuggestions([]);
         setSearchError('');
         setTarget([place.lat, place.lng]);
+        chosenName.current = fullName(place);
         onPick(place.lat, place.lng);
     }
 

@@ -1,5 +1,6 @@
 const request = require('supertest');
 const app = require('../src/app');
+const { AUTH, warehouseAuth } = require('./helpers/auth');
 const knex = require('../src/db');
 const { csvCell, toCsv } = require('../src/reports/csv');
 
@@ -31,7 +32,7 @@ test('toCsv writes a header row then one line per row', () => {
 });
 
 test('JSON report groups fulfilled and unfulfilled correctly', async () => {
-    const res = await request(app).get('/api/reports/report.json');
+    const res = await request(app).get('/api/reports/report.json').set('Authorization', AUTH);
     expect(res.status).toBe(200);
     const report = JSON.parse(res.text);
     expect(report.summary.fulfilled).toBe(1);
@@ -44,7 +45,7 @@ test('JSON report groups fulfilled and unfulfilled correctly', async () => {
 });
 
 test('CSV report has a header and every request', async () => {
-    const res = await request(app).get('/api/reports/requests.csv');
+    const res = await request(app).get('/api/reports/requests.csv').set('Authorization', AUTH);
     expect(res.status).toBe(200);
     const lines = res.text.split('\n');
     expect(lines[0].startsWith('Request ID,')).toBe(true);
@@ -53,7 +54,7 @@ test('CSV report has a header and every request', async () => {
 });
 
 test('PDF report downloads as a PDF', async () => {
-    const res = await request(app).get('/api/reports/report.pdf');
+    const res = await request(app).get('/api/reports/report.pdf').set('Authorization', AUTH);
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('application/pdf');
 });

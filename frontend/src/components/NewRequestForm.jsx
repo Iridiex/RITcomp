@@ -1,9 +1,14 @@
 import { useState } from 'react';
+import { Send } from 'lucide-react';
+import { API } from '../session';
 
-const API = 'http://localhost:3000/api';
+const URGENCIES = [
+    { value: 'Critical', help: 'people at risk within 24 hours' },
+    { value: 'High', help: 'needed within 2 to 3 days' },
+    { value: 'Moderate', help: 'comfort or planning' },
+];
 
-function NewRequestForm({ shelters, onCreated }) {
-    const [shelterId, setShelterId] = useState('');
+function NewRequestForm({ shelter, onCreated }) {
     const [item, setItem] = useState('');
     const [quantity, setQuantity] = useState('');
     const [urgency, setUrgency] = useState('High');
@@ -19,72 +24,63 @@ function NewRequestForm({ shelters, onCreated }) {
             const res = await fetch(`${API}/requests`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ shelter_id: shelterId, item, quantity, urgency, reason }),
+                body: JSON.stringify({ item, quantity, urgency, reason }),
             });
             const data = await res.json();
             if (!res.ok) {
                 setErrors(data.errors || [data.error]);
                 return;
             }
-            setSuccess(`Request ${data.request_id} added`);
+            setSuccess(`${data.request_id} sent to the coordinator for review`);
             setItem('');
             setQuantity('');
             setReason('');
+            setUrgency('High');
             onCreated();
         } catch (err) {
-            setErrors(['Could not reach the server. Is the backend running?']);
+            setErrors(['Could not reach the server']);
         }
     }
 
     return (
         <section className="card">
             <h2>New request</h2>
-            <form className="form" onSubmit={handleSubmit}>
-                <label>
-                    Shelter
-                    <select value={shelterId} onChange={(e) => setShelterId(e.target.value)}>
-                        <option value="">Choose a shelter</option>
-                        {shelters.map((s) => (
-                            <option key={s.shelter_id} value={s.shelter_id}>{s.name}</option>
-                        ))}
-                    </select>
-                </label>
-
+            <p className="muted small-note">
+                For {shelter ? shelter.name : 'your shelter'}. The coordinator reviews every request before it is dispatched.
+            </p>
+            <form className="form request-form" onSubmit={handleSubmit}>
                 <label>
                     Item
                     <input value={item} onChange={(e) => setItem(e.target.value)} placeholder="water" />
                 </label>
-
                 <label>
                     Quantity
-                    <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="100" />
+                    <input type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="100" />
                 </label>
-
                 <label>
                     Urgency
                     <select value={urgency} onChange={(e) => setUrgency(e.target.value)}>
-                        <option value="Critical">Critical: people at risk within 24 hours</option>
-                        <option value="High">High: needed within 2 to 3 days</option>
-                        <option value="Moderate">Moderate: comfort or planning</option>
+                        {URGENCIES.map((u) => (
+                            <option key={u.value} value={u.value}>{u.value}: {u.help}</option>
+                        ))}
                     </select>
                 </label>
-
                 {urgency === 'Critical' && (
                     <label className="full">
-                        Reason (required for Critical)
-                        <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="No drinking water since this morning, 120 people" />
+                        Why is this critical?
+                        <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. 40 elderly residents, no clean water since this morning" />
                     </label>
                 )}
-
-                <button type="submit">Add request</button>
+                <div className="actions full">
+                    <button type="submit" className="icon-text"><Send size={16} /> Send request</button>
+                </div>
+                {errors.length > 0 && (
+                    <ul className="errors full">
+                        {errors.map((err) => <li key={err}>{err}</li>)}
+                    </ul>
+                )}
+                {success && <p className="success full">{success}</p>}
             </form>
-
-            {errors.length > 0 && (
-                <ul className="errors">
-                    {errors.map((msg) => <li key={msg}>{msg}</li>)}
-                </ul>
-            )}
-            {success && <p className="success">{success}</p>}
         </section>
     );
 }

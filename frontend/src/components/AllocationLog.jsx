@@ -1,3 +1,4 @@
+import { IdLink } from '../inspect';
 function AllocationLog({ log }) {
     return (
         <section className="card">
@@ -16,8 +17,8 @@ function AllocationLog({ log }) {
                         {log.map((row) => (
                             <tr key={row.id}>
                                 <td>{row.run_id}</td>
-                                <td>{row.request_id}</td>
-                                <td>{row.warehouse_id || '-'}</td>
+                                <td><IdLink type="request" id={row.request_id} /></td>
+                                <td>{row.warehouse_id ? <IdLink type="warehouse" id={row.warehouse_id} /> : '-'}</td>
                                 <td>{row.quantity_sent}</td>
                                 <td><span className={`badge ${row.result.toLowerCase()}`}>{row.result}</span></td>
                                 <td>{row.reason || ''}</td>

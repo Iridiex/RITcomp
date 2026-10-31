@@ -1,3 +1,4 @@
+import { IdLink } from '../inspect';
 import { useState } from 'react';
 
 const API = 'http://localhost:3000/api';
@@ -29,8 +30,8 @@ function ReviewRow({ request, shelterName, onChanged }) {
 
     return (
         <tr>
-            <td>{request.request_id}</td>
-            <td>{shelterName}</td>
+            <td><IdLink type="request" id={request.request_id} /></td>
+            <td><IdLink type="shelter" id={request.shelter_id} label={shelterName} /></td>
             <td>{request.quantity} {request.item}</td>
             <td>{request.reason || '-'}</td>
             <td>

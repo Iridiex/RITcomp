@@ -1,5 +1,6 @@
 const request = require('supertest');
 const app = require('../src/app');
+const { AUTH, warehouseAuth } = require('./helpers/auth');
 const knex = require('../src/db');
 
 beforeAll(async () => {
@@ -24,32 +25,32 @@ afterAll(async () => {
 });
 
 test('a shelter with requests cannot be deleted', async () => {
-    const res = await request(app).delete('/api/shelters/SH-01');
+    const res = await request(app).delete('/api/shelters/SH-01').set('Authorization', AUTH);
     expect(res.status).toBe(400);
     const still = await knex('shelters').where({ shelter_id: 'SH-01' }).first();
     expect(still).toBeDefined();
 });
 
 test('a shelter with no requests is deleted', async () => {
-    const res = await request(app).delete('/api/shelters/SH-02');
+    const res = await request(app).delete('/api/shelters/SH-02').set('Authorization', AUTH);
     expect(res.status).toBe(200);
     const gone = await knex('shelters').where({ shelter_id: 'SH-02' }).first();
     expect(gone).toBeUndefined();
 });
 
 test('a warehouse holding stock cannot be deleted', async () => {
-    const res = await request(app).delete('/api/warehouses/WH-1');
+    const res = await request(app).delete('/api/warehouses/WH-1').set('Authorization', AUTH);
     expect(res.status).toBe(400);
 });
 
 test('an empty warehouse is deleted along with its zero-stock rows', async () => {
-    const res = await request(app).delete('/api/warehouses/WH-2');
+    const res = await request(app).delete('/api/warehouses/WH-2').set('Authorization', AUTH);
     expect(res.status).toBe(200);
     const rows = await knex('inventory').where({ warehouse_id: 'WH-2' });
     expect(rows.length).toBe(0);
 });
 
 test('deleting something that does not exist gives 404', async () => {
-    const res = await request(app).delete('/api/shelters/SH-99');
+    const res = await request(app).delete('/api/shelters/SH-99').set('Authorization', AUTH);
     expect(res.status).toBe(404);
 });

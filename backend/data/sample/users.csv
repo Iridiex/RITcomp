@@ -1,0 +1,12 @@
+username,password,name,role,shelter_id,warehouse_id,driver_id
+coordinator,relief2026,Relief Coordinator,coordinator,,,
+sh01,shelter2026,Al Barsha School Shelter,shelter,SH-01,,
+sh02,shelter2026,Deira Community Centre,shelter,SH-02,,
+sh03,shelter2026,Karama Sports Hall,shelter,SH-03,,
+sh04,shelter2026,Mirdif Mosque Hall,shelter,SH-04,,
+sh05,shelter2026,Jumeirah Youth Centre,shelter,SH-05,,
+wh1,warehouse2026,Al Quoz Relief Depot,warehouse,,WH-1,
+wh2,warehouse2026,Al Qusais Supply Hub,warehouse,,WH-2,
+ahmed,driver2026,Ahmed Khan,driver,,,DR-1
+priya,driver2026,Priya Nair,driver,,,DR-2
+omar,driver2026,Omar Haddad,driver,,,DR-3

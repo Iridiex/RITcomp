@@ -36,7 +36,7 @@ test('sample data gives 5 Fulfilled, 3 Partial, 2 Unfulfilled', () => {
     const { results } = allocate(requests, shelters, inventory);
     const count = (s) => results.filter((r) => r.status === s).length;
 
-    expect(count('Fulfilled')).toEqual(5);
+    expect(count('Allocated')).toEqual(5);
     expect(count('Partial')).toEqual(3);
     expect(count('Unfulfilled')).toEqual(2);
 });

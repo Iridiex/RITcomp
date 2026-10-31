@@ -1,3 +1,4 @@
+import { ExternalLink } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -25,8 +26,8 @@ function FitRoute({ points }) {
     return null;
 }
 
-function DriverView({ drivers, shipments, onChanged }) {
-    const [driverId, setDriverId] = useState('');
+function DriverView({ drivers, shipments, onChanged, fixedDriverId }) {
+    const [driverId, setDriverId] = useState(fixedDriverId || '');
     const [selectedId, setSelectedId] = useState(null);
     const [arrivingId, setArrivingId] = useState(null);
     const [damaged, setDamaged] = useState('0');
@@ -100,6 +101,7 @@ function DriverView({ drivers, shipments, onChanged }) {
 
     return (
         <>
+            {!fixedDriverId && (
             <section className="card driver-bar">
                 <label className="viewing-as">
                     Viewing as
@@ -109,8 +111,9 @@ function DriverView({ drivers, shipments, onChanged }) {
                         ))}
                     </select>
                 </label>
-                <span className="muted small-note">Replaced by the driver's own login later</span>
+                <span className="muted small-note">Coordinator preview of a driver's screen</span>
             </section>
+            )}
 
             {message && <p className="success">{message}</p>}
             {error && <p className="errors">{error}</p>}
@@ -134,8 +137,8 @@ function DriverView({ drivers, shipments, onChanged }) {
                                     </div>
                                     <div className="delivery-load">{s.quantity} {s.item}</div>
                                     <div className="delivery-route">
-                                        <span>From <strong>{s.warehouse_name}</strong></span>
-                                        <span>To <strong>{s.shelter_name}</strong></span>
+                                        <span>From <strong>{s.warehouse_id} · {s.warehouse_name}</strong></span>
+                                        <span>To <strong>{s.shelter_id} · {s.shelter_name}</strong> for {s.request_id}</span>
                                         <span className="muted">About {distanceKm(...routeOf(s)).toFixed(1)} km straight-line</span>
                                     </div>
 
@@ -225,7 +228,7 @@ function DriverView({ drivers, shipments, onChanged }) {
                             rel="noreferrer"
                             href={`https://www.google.com/maps/dir/?api=1&origin=${route[0].join(',')}&destination=${route[1].join(',')}`}
                         >
-                            Open directions in Google Maps ↗
+                            <span className="icon-text">Open directions in Google Maps <ExternalLink size={16} /></span>
                         </a>
                     )}
                 </section>

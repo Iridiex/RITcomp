@@ -1,3 +1,5 @@
+import { withToken } from '../session';
+import { FileText, FileSpreadsheet, Braces, Download } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const API = 'http://localhost:3000/api';
@@ -12,9 +14,9 @@ const STATUS_COLOURS = {
 };
 
 const DOWNLOADS = [
-    { format: 'PDF', icon: '📄', file: 'report.pdf', text: 'Printable report with summary, request tables and inventory' },
-    { format: 'CSV', icon: '📊', file: 'requests.csv', text: 'Every request in one table. Opens in Excel or Numbers' },
-    { format: 'JSON', icon: '{ }', file: 'report.json', text: 'Full report data for other systems to read' },
+    { format: 'PDF', icon: FileText, file: 'report.pdf', text: 'Printable report with summary, request tables and inventory' },
+    { format: 'CSV', icon: FileSpreadsheet, file: 'requests.csv', text: 'Every request in one table. Opens in Excel or Numbers' },
+    { format: 'JSON', icon: Braces, file: 'report.json', text: 'Full report data for other systems to read' },
 ];
 
 function ReportsPanel({ requests }) {
@@ -138,11 +140,11 @@ function ReportsPanel({ requests }) {
 
             <div className="download-grid">
                 {DOWNLOADS.map((d) => (
-                    <a key={d.format} className="download-card" href={`${API}/reports/${d.file}`}>
-                        <span className="download-icon">{d.icon}</span>
+                    <a key={d.format} className="download-card" href={withToken(`${API}/reports/${d.file}`)}>
+                        <span className="download-icon"><d.icon size={26} strokeWidth={1.75} /></span>
                         <span className="download-format">{d.format}</span>
                         <span className="muted small-note">{d.text}</span>
-                        <span className="download-cta">Download {d.format} ↓</span>
+                        <span className="download-cta icon-text"><Download size={16} /> Download {d.format}</span>
                     </a>
                 ))}
             </div>

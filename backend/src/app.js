@@ -1,9 +1,10 @@
-const { listShipments, assignDriver, pickUp, deliver } = require('./services/shipmentService');
+const { authenticate, authRouter } = require('./auth');
+const { listShipments, assignDriver, pickUp, deliver, failDelivery } = require('./services/shipmentService');
 const { buildReport } = require('./services/reportService');
 const { toCsv } = require('./reports/csv');
 const { writePdf } = require('./reports/pdf');
 const { createSite, updateSite, deleteSite } = require('./services/siteService');
-const { addStock } = require('./services/stockService');
+const { addStock, removeStock, listMovements } = require('./services/stockService');
 const knex = require('./db');
 const express = require('express');
 const cors = require('cors');
@@ -14,6 +15,8 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/api', authenticate);
+app.use('/api', authRouter);
 
 app.get('/api/health', (req, res) => {
     res.json({ ok: true });
@@ -213,12 +216,27 @@ app.patch('/api/shipments/:id/assign', async (req, res) => {
 });
 
 app.patch('/api/shipments/:id/pickup', async (req, res) => {
-    try { sendResult(res, await pickUp(req.params.id), 200); }
+    try { sendResult(res, await pickUp(req.params.id, req.body), 200); }
     catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.patch('/api/shipments/:id/deliver', async (req, res) => {
     try { sendResult(res, await deliver(req.params.id, req.body), 200); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.patch('/api/shipments/:id/fail', async (req, res) => {
+    try { sendResult(res, await failDelivery(req.params.id, req.body), 200); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/inventory/remove', async (req, res) => {
+    try { sendResult(res, await removeStock(req.body), 200); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/stock/movements', async (req, res) => {
+    try { res.json(await listMovements()); }
     catch (err) { res.status(500).json({ error: err.message }); }
 });
 
