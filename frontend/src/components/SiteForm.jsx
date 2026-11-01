@@ -44,10 +44,13 @@ function SiteForm({ kind, site, currentLogin, otherSites, onSaved, onCancel }) {
 
     return (
         <form className="form" onSubmit={handleSubmit}>
-
             <label>
                 Name
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder={isShelter ? 'e.g. Karama Sports Hall' : 'e.g. Al Quoz Relief Depot'} />
+                <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={isShelter ? 'e.g. Karama Sports Hall' : 'e.g. Al Quoz Relief Depot'}
+                />
             </label>
 
             {isShelter && (
@@ -55,7 +58,7 @@ function SiteForm({ kind, site, currentLogin, otherSites, onSaved, onCancel }) {
                     Priority
                     <select value={priority} onChange={(e) => setPriority(e.target.value)}>
                         <option value="1">1: highest (many vulnerable people)</option>
-                        <option value="2">2: medium</option>
+                        <option value="2">2: Moderate</option>
                         <option value="3">3: lower</option>
                     </select>
                 </label>

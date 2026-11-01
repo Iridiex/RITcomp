@@ -65,11 +65,14 @@ test('the item list names each stocked item once, keeps items that have run out,
     expect(res.body).toEqual([{ item: 'rice' }, { item: 'tents' }, { item: 'water' }]);
 });
 
-test('coordinator can view but not create requests', async () => {
+test('coordinator can log a request for a shelter, and it skips review', async () => {
     expect((await request(app).get('/api/requests').set('Authorization', AUTH)).status).toBe(200);
     const res = await request(app).post('/api/requests').set('Authorization', AUTH)
-        .send({ shelter_id: 'SH-01', item: 'water', quantity: 10, urgency: 'High' });
-    expect(res.status).toBe(403);
+        .send({ shelter_id: 'SH-01', item: 'water', quantity: 10, urgency: 'High', reason: 'Shelter called it in' });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ shelter_id: 'SH-01', status: 'Pending', item: 'water' });
+    expect((await request(app).post('/api/requests').set('Authorization', AUTH)
+        .send({ item: 'water', quantity: 5, urgency: 'High', reason: 'No shelter picked' })).status).toBe(400);
 });
 
 test('a shelter cannot review requests', async () => {

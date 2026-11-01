@@ -10,7 +10,9 @@ const URGENCIES = [
     { value: 'Moderate', help: 'comfort or planning', ask: 'What is this for?', example: 'e.g. Restocking for next week' },
 ];
 
-function NewRequestForm({ shelter, items, onCreated }) {
+// Shelters send for themselves (goes to review). Coordinators pick a shelter and it is approved at once.
+function NewRequestForm({ shelter, shelters, items, onCreated, asCoordinator }) {
+    const [shelterId, setShelterId] = useState('');
     const [item, setItem] = useState('');
     const [quantity, setQuantity] = useState('');
     const [urgency, setUrgency] = useState('High');
@@ -20,12 +22,16 @@ function NewRequestForm({ shelter, items, onCreated }) {
 
     const chosen = items.find((i) => i.item === item.trim().toLowerCase());
     const level = URGENCIES.find((u) => u.value === urgency);
+    const forShelter = asCoordinator
+        ? (shelters || []).find((s) => s.shelter_id === shelterId)
+        : shelter;
 
     async function handleSubmit(e) {
         e.preventDefault();
         setErrors([]);
         setSuccess('');
         const problems = [];
+        if (asCoordinator && !forShelter) problems.push('Choose a shelter');
         if (!chosen) problems.push(item.trim() ? `Choose an item from the list. Warehouses do not stock ${item.trim()}` : 'Choose an item');
         if (!reason.trim()) problems.push('Say why you need this');
         if (problems.length > 0) {
@@ -33,21 +39,26 @@ function NewRequestForm({ shelter, items, onCreated }) {
             return;
         }
         try {
+            const body = { item: chosen.item, quantity, urgency, reason };
+            if (asCoordinator) body.shelter_id = forShelter.shelter_id;
             const res = await fetch(`${API}/requests`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ item: chosen.item, quantity, urgency, reason }),
+                body: JSON.stringify(body),
             });
             const data = await res.json();
             if (!res.ok) {
                 setErrors(data.errors || [data.error]);
                 return;
             }
-            setSuccess(`${data.request_id} sent to the coordinator for review`);
+            setSuccess(asCoordinator
+                ? `${data.request_id} logged for ${forShelter.name}. Ready for the next allocation run.`
+                : `${data.request_id} sent to the coordinator for review`);
             setItem('');
             setQuantity('');
             setReason('');
             setUrgency('High');
+            if (asCoordinator) setShelterId('');
             onCreated();
         } catch {
             setErrors(['Could not reach the server']);
@@ -56,11 +67,24 @@ function NewRequestForm({ shelter, items, onCreated }) {
 
     return (
         <section className="card">
-            <h2>New request</h2>
+            <h2>{asCoordinator ? 'Log a request for a shelter' : 'New request'}</h2>
             <p className="muted small-note">
-                For {shelter ? shelter.name : 'your shelter'}. The coordinator reviews every request before it is dispatched.
+                {asCoordinator
+                    ? 'Use this when a shelter called in, or you are logging a need yourself. It is approved straight away and goes out in the next allocation run.'
+                    : `For ${shelter ? shelter.name : 'your shelter'}. The coordinator reviews every request before it is dispatched.`}
             </p>
             <form className="form request-form" onSubmit={handleSubmit}>
+                {asCoordinator && (
+                    <label>
+                        Shelter
+                        <select value={shelterId} onChange={(e) => setShelterId(e.target.value)}>
+                            <option value="">Choose a shelter</option>
+                            {(shelters || []).map((s) => (
+                                <option key={s.shelter_id} value={s.shelter_id}>{s.name}</option>
+                            ))}
+                        </select>
+                    </label>
+                )}
                 <label>
                     Item
                     <ItemPicker items={items} value={item} onChange={setItem} invalid={item.trim() !== '' && !chosen} />
@@ -83,7 +107,9 @@ function NewRequestForm({ shelter, items, onCreated }) {
                 </label>
                 <UrgencyHint item={chosen ? chosen.item : ''} quantity={quantity} reason={reason} urgency={urgency} onSwitch={setUrgency} />
                 <div className="actions full">
-                    <button type="submit" className="icon-text"><Send size={16} /> Send request</button>
+                    <button type="submit" className="icon-text">
+                        <Send size={16} /> {asCoordinator ? 'Log request' : 'Send request'}
+                    </button>
                 </div>
                 {errors.length > 0 && (
                     <ul className="errors full">

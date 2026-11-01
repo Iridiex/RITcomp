@@ -14,7 +14,7 @@ const RULES = [
     { methods: ['POST'], path: /^\/auth\/login$/, public: true },
     { methods: ['GET', 'PATCH'], path: /^\/auth\/me$/, roles: ALL },
     { methods: ['GET'], path: /^\/requests$/, roles: ['coordinator', 'shelter'] },
-    { methods: ['POST'], path: /^\/requests$/, roles: ['shelter'] },
+    { methods: ['POST'], path: /^\/requests$/, roles: ['coordinator', 'shelter'] },
     { methods: ['GET'], path: /^\/inventory$/, roles: ['coordinator', 'warehouse'] },
     { methods: ['POST'], path: /^\/inventory(\/remove)?$/, roles: ['warehouse'] },
     { methods: ['GET'], path: /^\/stock\/movements$/, roles: ['coordinator', 'warehouse'] },
@@ -117,8 +117,12 @@ authRouter.get('/requests', async (req, res, next) => {
 
 authRouter.post('/requests', (req, res, next) => {
     req.body = req.body || {};
-    req.body.shelter_id = req.user.shelter_id;
-    req.body.submitted_by = 'shelter';
+    if (req.user.role === 'shelter') {
+        req.body.shelter_id = req.user.shelter_id;
+        req.body.submitted_by = 'shelter';
+    } else {
+        req.body.submitted_by = 'coordinator';
+    }
     next();
 });
 

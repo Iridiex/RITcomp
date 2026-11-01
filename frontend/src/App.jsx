@@ -38,7 +38,7 @@ const ROLE_PAGES = {
 };
 
 const ROLE_DATA = {
-    coordinator: ['requests', 'inventory', 'allocations/log', 'shelters', 'warehouses', 'shipments', 'drivers', 'stock/movements', 'users', 'incidents'],
+    coordinator: ['requests', 'inventory', 'allocations/log', 'shelters', 'warehouses', 'shipments', 'drivers', 'stock/movements', 'users', 'incidents', 'items'],
     shelter: ['requests', 'shelters', 'warehouses', 'shipments', 'items'],
     warehouse: ['inventory', 'shelters', 'warehouses', 'shipments', 'stock/movements', 'shortages'],
     driver: ['shelters', 'warehouses', 'shipments', 'incidents'],
@@ -134,6 +134,10 @@ function Workspace({ user, onLogout, onSessionChange }) {
     }, [user.role]);
 
     const { requests, inventory, log, shelters, warehouses, shipments, drivers, movements, users, shortages, items, incidents } = data;
+    // Prefer /items; if that list is empty (e.g. page loaded before it was fetched), use stocked inventory names
+    const requestItems = items.length > 0
+        ? items
+        : [...new Set(inventory.map((row) => row.item))].sort().map((item) => ({ item }));
     const count = (s) => requests.filter((r) => r.status === s).length;
     const stats = [
         { label: 'Requests', value: requests.length, tone: 'total', icon: ClipboardList, filter: 'All' },
@@ -212,6 +216,7 @@ function Workspace({ user, onLogout, onSessionChange }) {
 
                     {page === 'requests' && (
                         <>
+                            <NewRequestForm asCoordinator shelters={shelters} items={requestItems} onCreated={loadAll} />
                             <ReviewQueue requests={requests} shelters={shelters} onChanged={loadAll} />
                             <RequestsTable requests={requests} shelters={shelters} filter={statusFilter} onFilterChange={setStatusFilter} />
                         </>
@@ -241,7 +246,7 @@ function Workspace({ user, onLogout, onSessionChange }) {
 
                     {page === 'my-requests' && (
                         <>
-                            <NewRequestForm shelter={myShelter} items={items} onCreated={loadAll} />
+                            <NewRequestForm shelter={myShelter} items={requestItems} onCreated={loadAll} />
                             <RequestsTable requests={requests} shelters={shelters} filter={statusFilter} onFilterChange={setStatusFilter} />
                         </>
                     )}
