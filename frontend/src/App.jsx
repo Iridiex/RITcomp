@@ -19,6 +19,7 @@ import DriverView from './components/DriverView';
 import ReportsPanel from './components/ReportsPanel';
 import MedicalBoard from './components/MedicalBoard';
 import MedicalReviewQueue from './components/MedicalReviewQueue';
+import MedicalStaffPanel from './components/MedicalStaffPanel';
 import DetailDrawer from './components/DetailDrawer';
 import AccountPanel from './components/AccountPanel';
 import ShortageList from './components/ShortageList';
@@ -243,7 +244,8 @@ function Workspace({ user, onLogout, onSessionChange }) {
                         <>
                             <NewRequestForm asCoordinator startKind="doctor" shelters={shelters} items={requestItems} onCreated={loadAll} />
                             <MedicalReviewQueue medical={medical} onChanged={loadAll} />
-                            <MedicalBoard medical={medical} hospitals={hospitals} onChanged={loadAll} />
+                            <MedicalBoard medical={medical} onChanged={loadAll} />
+                            <MedicalStaffPanel hospitals={hospitals} shelters={shelters} warehouses={warehouses} onChanged={loadAll} />
                         </>
                     )}
 
