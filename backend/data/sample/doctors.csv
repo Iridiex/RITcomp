@@ -1,0 +1,21 @@
+doctor_id,name,specialty,status,hospital_id
+DOC-01,Fatima Al Mazrouei,Trauma Specialist,Available,H-1
+DOC-02,James Okonkwo,General Practitioner,Available,H-1
+DOC-03,Sara Ibrahim,Emergency Physician,Available,H-1
+DOC-04,Noura Hassan,Pediatrician,Available,H-2
+DOC-05,Lina Rahman,Pediatrician,Available,H-2
+DOC-06,Khaled Mansoor,General Practitioner,Available,H-3
+DOC-07,Priya Menon,Paramedic,Available,H-3
+DOC-08,Omar Al Suwaidi,General Practitioner,Available,H-4
+DOC-09,Aisha Al Qasimi,Infectious Disease Specialist,Available,H-2
+DOC-10,Hassan Farouk,Geriatrician,Available,H-3
+DOC-11,Maryam Al Falasi,Obstetrician,Available,H-5
+DOC-12,David Chen,Orthopedic Specialist,Available,H-1
+DOC-13,Leila Haddad,Emergency Physician,Available,H-1
+DOC-14,Yusuf Khan,Paramedic,Available,H-4
+DOC-15,Rania Saleh,Emergency Physician,Available,H-4
+DOC-16,Noor Al Shamsi,Infectious Disease Specialist,Available,H-3
+DOC-17,Amira Nasser,Obstetrician,Available,H-3
+DOC-18,Tomasz Kowalski,Paramedic,Available,H-1
+DOC-19,Elena Petrova,Geriatrician,Available,H-1
+DOC-20,Samir Aziz,Orthopedic Specialist,Available,H-3

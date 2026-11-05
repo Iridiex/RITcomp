@@ -47,6 +47,13 @@ function validateStock(body, warehouseIds) {
     return errors;
 }
 
+function validateDoctor(body, hospitalIds) {
+    const errors = [];
+    if (isBlank(body.name)) errors.push('Enter a name');
+    if (!hospitalIds.includes(body.hospital_id)) errors.push('Choose a hospital');
+    return errors;
+}
+
 function validateDriver(body) {
     const errors = [];
     if (isBlank(body.name)) { errors.push('Enter a name'); }
@@ -55,4 +62,4 @@ function validateDriver(body) {
     return errors;
 }
 
-module.exports = { validateNewRequest, validateSite, validateStock, validateDriver, cleanText, isBlank, URGENCIES };
+module.exports = { validateNewRequest, validateSite, validateStock, validateDoctor, validateDriver, cleanText, isBlank, URGENCIES };

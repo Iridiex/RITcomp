@@ -1,4 +1,5 @@
-import { ArrowLeft, X } from 'lucide-react';
+import { ArrowLeft, Check, X } from 'lucide-react';
+import { API } from '../session';
 import MiniMap from './MiniMap';
 import { useEffect } from 'react';
 import { IdLink } from '../inspect';
@@ -11,7 +12,21 @@ import { damageLines, failureText, useNoteLanguage } from '../noteLanguage';
 import CloseRequest from './CloseRequest';
 import ShipmentOverride from './ShipmentOverride';
 
-const TITLES = { request: 'Request', shipment: 'Shipment', shelter: 'Shelter', warehouse: 'Warehouse', driver: 'Driver' };
+const TITLES = {
+    request: 'Request', shipment: 'Shipment', shelter: 'Shelter', warehouse: 'Warehouse',
+    driver: 'Driver', medical: 'Medical ticket', hospital: 'Hospital', doctor: 'Doctor',
+};
+
+function statusClass(status) {
+    if (status === 'Dispatched') return 'allocated';
+    if (status === 'Completed' || status === 'Available') return 'fulfilled';
+    if (String(status).startsWith('Pending')) return 'unfulfilled';
+    return String(status || '').toLowerCase().replace(/ /g, '-');
+}
+
+function doctorsOf(data) {
+    return (data.hospitals || []).flatMap((h) => (h.doctors || []).map((d) => ({ ...d, hospital_name: h.name })));
+}
 
 function Field({ label, children }) {
     return (
@@ -24,7 +39,7 @@ function Field({ label, children }) {
 
 function Badge({ value }) {
     if (!value) return null;
-    return <span className={`badge ${value.toLowerCase().replace(' ', '-')}`}>{value}</span>;
+    return <span className={`badge ${statusClass(value)}`}>{value}</span>;
 }
 
 function ShipmentList({ shipments }) {
@@ -202,6 +217,9 @@ function ShelterDetail({ id, data }) {
 
             <h4>Shipments heading here ({shipments.length})</h4>
             <ShipmentList shipments={shipments} />
+
+            <h4>Medical tickets ({(data.medical || []).filter((r) => r.shelter_id === id).length})</h4>
+            <MedicalList tickets={(data.medical || []).filter((r) => r.shelter_id === id)} empty="No medical tickets yet." />
         </>
     );
 }
@@ -310,8 +328,149 @@ function DriverDetail({ id, data }) {
     );
 }
 
+function MedicalList({ tickets, empty }) {
+    if (tickets.length === 0) return <p className="muted small-note">{empty}</p>;
+    return (
+        <ul className="link-list">
+            {tickets.map((r) => (
+                <li key={r.medical_id}>
+                    <IdLink type="medical" id={r.medical_id} /> · {r.specialty}{' '}
+                    {r.doctor_id && <IdLink type="doctor" id={r.doctor_id} chip />}{' '}
+                    {r.hospital_id && <IdLink type="hospital" id={r.hospital_id} label={r.hospital_name} chip />}{' '}
+                    <Badge value={r.status} />
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+function MedicalDetail({ id, data }) {
+    const r = (data.medical || []).find((x) => x.medical_id === id);
+    if (!r) return <p className="muted">Not found.</p>;
+    const shelter = data.shelters.find((s) => s.shelter_id === r.shelter_id);
+    const hospital = (data.hospitals || []).find((h) => h.hospital_id === r.hospital_id);
+    const km = r.distance == null ? null : (r.distance_km != null ? r.distance_km : Number((r.distance * 111.32).toFixed(2)));
+
+    async function arrived() {
+        const res = await fetch(`${API}/medical/${id}/complete`, { method: 'PATCH' });
+        if (res.ok && data.onChanged) data.onChanged();
+    }
+
+    return (
+        <>
+            <div className="detail-head">
+                <h3>{r.specialty}</h3>
+                <Badge value={r.status} />
+            </div>
+            <Field label="Shelter">
+                <IdLink type="shelter" id={r.shelter_id} label={shelter ? `${r.shelter_id} · ${shelter.name}` : r.shelter_id} />
+            </Field>
+            {r.reason && <Field label="Reason">{r.reason}</Field>}
+            {r.ai_specialty && (
+                <Field label="Specialty check">
+                    {r.ai_specialty === r.specialty
+                        ? `Agrees with ${r.ai_specialty}${r.ai_why ? ` · ${r.ai_why}` : ''}`
+                        : `Suggested ${r.ai_specialty}${r.ai_why ? ` · ${r.ai_why}` : ''}`}
+                </Field>
+            )}
+            {r.review_note && <Field label="Review note">{r.review_note}</Field>}
+            <Field label="Doctor">
+                {r.doctor_id ? <IdLink type="doctor" id={r.doctor_id} label={`${r.doctor_id}${r.doctor_name ? ` · ${r.doctor_name}` : ''}`} /> : 'Not assigned'}
+            </Field>
+            <Field label="Hospital">
+                {r.hospital_id
+                    ? <IdLink type="hospital" id={r.hospital_id} label={hospital ? `${r.hospital_id} · ${hospital.name}` : r.hospital_name || r.hospital_id} />
+                    : 'Waiting for a free doctor'}
+            </Field>
+            {r.distance != null && (
+                <Field label="Travel distance">{Number(r.distance).toFixed(4)}{km != null ? ` (${km} km)` : ''}</Field>
+            )}
+            {data.role === 'shelter' && r.status === 'Dispatched' && (
+                <div className="actions">
+                    <button type="button" className="secondary small icon-text" onClick={arrived}>
+                        <Check size={14} /> Doctor arrived
+                    </button>
+                </div>
+            )}
+            {shelter && hospital && (
+                <MiniMap
+                    points={[
+                        { lat: shelter.latitude, lng: shelter.longitude, color: '#dc2626', label: shelter.name },
+                        { lat: hospital.latitude, lng: hospital.longitude, color: '#0f766e', label: hospital.name },
+                    ]}
+                    lines={[[{ lat: hospital.latitude, lng: hospital.longitude }, { lat: shelter.latitude, lng: shelter.longitude }]]}
+                />
+            )}
+            {shelter && !hospital && (
+                <MiniMap points={[{ lat: shelter.latitude, lng: shelter.longitude, color: '#dc2626', label: shelter.name }]} />
+            )}
+        </>
+    );
+}
+
+function HospitalDetail({ id, data }) {
+    const hospital = (data.hospitals || []).find((x) => x.hospital_id === id);
+    if (!hospital) return <p className="muted">Not found.</p>;
+    const doctors = hospital.doctors || [];
+    const tickets = (data.medical || []).filter((r) => r.hospital_id === id);
+
+    return (
+        <>
+            <div className="detail-head">
+                <h3>{hospital.name}</h3>
+                <span className="tag">{doctors.filter((d) => d.status === 'Available').length} free</span>
+            </div>
+            <Field label="Location">{Number(hospital.latitude).toFixed(4)}, {Number(hospital.longitude).toFixed(4)}</Field>
+            <MiniMap points={[{ lat: hospital.latitude, lng: hospital.longitude, color: '#0f766e', label: hospital.name }]} />
+
+            <h4>On-call doctors ({doctors.length})</h4>
+            {doctors.length === 0 ? (
+                <p className="muted small-note">No doctors listed.</p>
+            ) : (
+                <ul className="link-list">
+                    {doctors.map((d) => (
+                        <li key={d.doctor_id}>
+                            <IdLink type="doctor" id={d.doctor_id} /> · {d.name} · {d.specialty} <Badge value={d.status} />
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            <h4>Tickets from here ({tickets.length})</h4>
+            <MedicalList tickets={tickets} empty="No medical tickets assigned here." />
+        </>
+    );
+}
+
+function DoctorDetail({ id, data }) {
+    const doctor = doctorsOf(data).find((d) => d.doctor_id === id);
+    if (!doctor) return <p className="muted">Not found.</p>;
+    const tickets = (data.medical || []).filter((r) => r.doctor_id === id);
+    const hospital = (data.hospitals || []).find((h) => h.hospital_id === doctor.hospital_id);
+
+    return (
+        <>
+            <div className="detail-head">
+                <h3>{doctor.name}</h3>
+                <Badge value={doctor.status} />
+            </div>
+            <Field label="Specialty">{doctor.specialty}</Field>
+            <Field label="Hospital">
+                <IdLink type="hospital" id={doctor.hospital_id} label={hospital ? `${doctor.hospital_id} · ${hospital.name}` : doctor.hospital_name} />
+            </Field>
+            {hospital && (
+                <MiniMap points={[{ lat: hospital.latitude, lng: hospital.longitude, color: '#0f766e', label: hospital.name }]} />
+            )}
+
+            <h4>Tickets ({tickets.length})</h4>
+            <MedicalList tickets={tickets} empty="No tickets assigned to this doctor." />
+        </>
+    );
+}
+
 const DETAILS = {
-    request: RequestDetail, shipment: ShipmentDetail, shelter: ShelterDetail, warehouse: WarehouseDetail, driver: DriverDetail,
+    request: RequestDetail, shipment: ShipmentDetail, shelter: ShelterDetail, warehouse: WarehouseDetail,
+    driver: DriverDetail, medical: MedicalDetail, hospital: HospitalDetail, doctor: DoctorDetail,
 };
 
 function DetailDrawer() {

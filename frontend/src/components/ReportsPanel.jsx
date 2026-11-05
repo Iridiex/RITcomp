@@ -1,4 +1,5 @@
 import { API, withToken } from '../session';
+import { IdLink } from '../inspect';
 import { FileText, FileSpreadsheet, Braces, Download, Gauge, Send, TrendingDown, ClipboardList } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -17,9 +18,10 @@ const DOWNLOADS = [
     { format: 'PDF', icon: FileText, file: 'report.pdf', text: 'Printable report with summary, request tables and inventory' },
     { format: 'CSV', icon: FileSpreadsheet, file: 'requests.csv', text: 'Every request in one table. Opens in Excel or Numbers' },
     { format: 'JSON', icon: Braces, file: 'report.json', text: 'Full report data for other systems to read' },
+    { format: 'Medical CSV', icon: FileSpreadsheet, file: 'medical.csv', text: 'Doctor ID, specialty, hospital and travel distance' },
 ];
 
-function ReportsPanel({ requests }) {
+function ReportsPanel({ requests, medical = [] }) {
     const [report, setReport] = useState(null);
     const [error, setError] = useState('');
 
@@ -31,7 +33,7 @@ function ReportsPanel({ requests }) {
                 setError('');
             })
             .catch(() => setError('Could not load the report preview'));
-    }, [requests]);
+    }, [requests, medical]);
 
     if (error) return <p className="errors">{error}</p>;
     if (!report) return <p className="muted">Loading report...</p>;
@@ -130,6 +132,42 @@ function ReportsPanel({ requests }) {
                                         <td>{row.requested}</td>
                                         <td>{row.sent}</td>
                                         <td className="out-of-stock">{row.short}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </section>
+
+            <section className="card">
+                <h2>Medical dispatch</h2>
+                {medical.length === 0 && !(report.medical && report.medical.length) ? (
+                    <p className="muted">No medical tickets yet.</p>
+                ) : (
+                    <div className="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Ticket</th>
+                                    <th>Doctor ID</th>
+                                    <th>Specialty</th>
+                                    <th>Hospital Name</th>
+                                    <th>Travel Distance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(report.medical || []).map((row) => (
+                                    <tr key={row.medical_id}>
+                                        <td><IdLink type="medical" id={row.medical_id} /></td>
+                                        <td>{row.doctor_id ? <IdLink type="doctor" id={row.doctor_id} /> : '—'}</td>
+                                        <td>{row.specialty}</td>
+                                        <td>
+                                            {row.hospital_id
+                                                ? <IdLink type="hospital" id={row.hospital_id} label={row.hospital_name || row.hospital_id} />
+                                                : '—'}
+                                        </td>
+                                        <td>{row.travel_distance === '' || row.travel_distance == null ? '—' : row.travel_distance}</td>
                                     </tr>
                                 ))}
                             </tbody>

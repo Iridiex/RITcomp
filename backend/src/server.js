@@ -8,10 +8,11 @@ try {
 
 const app = require('./app');
 const knex = require('./db');
+const { seedMedical } = require('./seedMedical');
 
-knex.migrate.latest({ directory: path.join(__dirname, '../migrations') }).then(() => {
+knex.migrate.latest({ directory: path.join(__dirname, '../migrations') }).then(() => seedMedical(knex)).then(() => {
     app.listen(3000, () => {
         console.log('Server running on port 3000');
-        console.log(process.env.GEMINI_API_KEY ? 'Urgency check: Gemini' : 'Urgency check: off (no GEMINI_API_KEY)');
+        console.log(process.env.GEMINI_API_KEY ? 'AI checks: Gemini' : 'AI checks: off (no GEMINI_API_KEY)');
     });
 });

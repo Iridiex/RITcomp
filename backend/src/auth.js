@@ -21,10 +21,14 @@ const RULES = [
     { methods: ['GET'], path: /^\/shortages$/, roles: ['coordinator', 'warehouse'] },
     { methods: ['GET'], path: /^\/items$/, roles: ALL },
     { methods: ['POST'], path: /^\/urgency\/check$/, roles: ['coordinator', 'shelter'] },
+    { methods: ['POST'], path: /^\/specialty\/check$/, roles: ['coordinator', 'shelter'] },
     { methods: ['GET'], path: /^\/ai\/status$/, roles: ALL },
     { methods: ['GET'], path: /^\/incidents$/, roles: ['coordinator', 'driver'] },
     { methods: ['POST'], path: /^\/speech$/, roles: ['coordinator', 'driver'] },
-    { methods: ['GET'], path: /^\/(shelters|warehouses)$/, roles: ALL },
+    { methods: ['GET'], path: /^\/(shelters|warehouses|hospitals|doctors)$/, roles: ALL },
+    { methods: ['GET', 'POST'], path: /^\/medical$/, roles: ['coordinator', 'shelter'] },
+    { methods: ['PATCH'], path: /^\/medical\/[^/]+\/review$/, roles: ['coordinator'] },
+    { methods: ['PATCH'], path: /^\/medical\/[^/]+\/complete$/, roles: ['coordinator', 'shelter'] },
     { methods: ['GET'], path: /^\/shipments$/, roles: ALL },
     { methods: ['PATCH'], path: /^\/requests\/[^/]+\/close$/, roles: ['coordinator', 'shelter'] },
     { methods: ['PATCH'], path: /^\/shipments\/[^/]+\/(pickup|deliver|fail)$/, roles: ['coordinator', 'driver'] },
@@ -124,6 +128,30 @@ authRouter.post('/requests', (req, res, next) => {
         req.body.submitted_by = 'coordinator';
     }
     next();
+});
+
+authRouter.post('/medical', (req, res, next) => {
+    req.body = req.body || {};
+    if (req.user.role === 'shelter') {
+        req.body.shelter_id = req.user.shelter_id;
+        req.body.submitted_by = 'shelter';
+    } else {
+        req.body.submitted_by = 'coordinator';
+    }
+    next();
+});
+
+authRouter.patch('/medical/:id/complete', async (req, res, next) => {
+    if (req.user.role !== 'shelter') return next();
+    try {
+        const ticket = await knex('medical_requests').where({ medical_id: req.params.id }).first();
+        if (ticket && ticket.shelter_id !== req.user.shelter_id) {
+            return res.status(403).json({ error: 'This ticket belongs to another shelter' });
+        }
+        next();
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 authRouter.patch('/requests/:id/close', async (req, res, next) => {

@@ -17,6 +17,14 @@ const INVENTORY_COLUMNS = [
     { key: 'quantity', label: 'Quantity', width: 60 },
 ];
 
+const MEDICAL_COLUMNS = [
+    { key: 'doctor_id', label: 'Doctor ID', width: 70 },
+    { key: 'specialty', label: 'Specialty', width: 130 },
+    { key: 'hospital_name', label: 'Hospital', width: 170 },
+    { key: 'travel_distance', label: 'Distance', width: 70 },
+    { key: 'status', label: 'Status', width: 75 },
+];
+
 const DAMAGE_COLUMNS = [
     { key: 'shipment_id', label: 'Shipment', width: 55 },
     { key: 'request_id', label: 'Request', width: 55 },
@@ -94,6 +102,9 @@ function writePdf(report, stream) {
 
     heading(doc, 'Current inventory');
     drawTable(doc, INVENTORY_COLUMNS, report.inventory);
+
+    heading(doc, 'Medical dispatch');
+    drawTable(doc, MEDICAL_COLUMNS, report.medical || []);
 
     doc.end();
 }

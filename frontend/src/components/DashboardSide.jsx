@@ -12,7 +12,7 @@ const LONG_WAIT_HOURS = 24;
 const ON_ROAD_HOURS = 6;
 const NOT_PICKED_UP_HOURS = 4;
 
-function DashboardSide({ requests, shelters, inventory, warehouses, shipments, incidents = [], onIncidentsChanged, onOpenRequests, onOpenShipments, onRunAllocation }) {
+function DashboardSide({ requests, shelters, inventory, warehouses, shipments, incidents = [], medical = [], onIncidentsChanged, onOpenRequests, onOpenShipments, onOpenMedical, onRunAllocation }) {
     const [clearing, setClearing] = useState(null);
     const [clearError, setClearError] = useState('');
     const inspect = useInspect();
@@ -53,7 +53,10 @@ function DashboardSide({ requests, shelters, inventory, warehouses, shipments, i
     const outOfStock = inventory.filter((row) => row.quantity === 0);
     const onRoadTooLong = shipments.filter((s) => s.status === 'In transit' && hoursSince(s.picked_up_at) >= ON_ROAD_HOURS);
     const notPickedUp = shipments.filter((s) => s.status === 'Ready' && s.driver_id && hoursSince(s.created_at) >= NOT_PICKED_UP_HOURS);
-    const allClear = incidents.length + awaiting + approved + noDriver + headingBack + short.length + outOfStock.length + onRoadTooLong.length + notPickedUp.length === 0;
+    const medicalPending = medical.filter((r) => String(r.status).startsWith('Pending'));
+    const medicalOpen = medical.filter((r) => r.status === 'Dispatched');
+    const medicalReview = medical.filter((r) => r.status === 'Awaiting review');
+    const allClear = incidents.length + awaiting + approved + noDriver + headingBack + short.length + outOfStock.length + onRoadTooLong.length + notPickedUp.length + medicalPending.length + medicalOpen.length + medicalReview.length === 0;
 
     const maxQty = Math.max(1, ...inventory.map((row) => row.quantity));
 
@@ -92,6 +95,28 @@ function DashboardSide({ requests, shelters, inventory, warehouses, shipments, i
                                 <span className="go icon-text">Review <ArrowRight size={14} /></span>
                             </li>
                         )}
+                        {medicalReview.length > 0 && (
+                            <li className="attention-item info" onClick={onOpenMedical}>
+                                <span><strong>{medicalReview.length}</strong> doctor request(s) waiting for review</span>
+                                <span className="go icon-text">Review <ArrowRight size={14} /></span>
+                            </li>
+                        )}
+                        {medicalPending.map((r) => (
+                            <li key={r.medical_id} className="attention-item danger" onClick={() => inspect.open('medical', r.medical_id)}>
+                                <span>
+                                    <strong>{r.medical_id}</strong> {r.specialty} at {r.shelter_name || r.shelter_id}. No matching doctor is free.
+                                </span>
+                                <span className="go icon-text">Open <ArrowRight size={14} /></span>
+                            </li>
+                        ))}
+                        {medicalOpen.map((r) => (
+                            <li key={r.medical_id} className="attention-item info" onClick={() => inspect.open('medical', r.medical_id)}>
+                                <span>
+                                    <strong>{r.medical_id}</strong> {r.doctor_id} heading to {r.shelter_name || r.shelter_id}
+                                </span>
+                                <span className="go icon-text">Open <ArrowRight size={14} /></span>
+                            </li>
+                        ))}
                         {approved > 0 && (
                             <li className="attention-item info" onClick={onRunAllocation}>
                                 <span><strong>{approved}</strong> approved, not sent yet</span>

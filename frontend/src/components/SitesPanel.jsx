@@ -2,8 +2,10 @@ import { IdLink } from '../inspect';
 import { useState } from 'react';
 import SiteForm from './SiteForm';
 import DriverForm from './DriverForm';
+import HospitalForm from './HospitalForm';
+import DoctorForm from './DoctorForm';
 import Modal from './Modal';
-import { Trash2, KeyRound, House, Warehouse, Truck, Plus } from 'lucide-react';
+import { Trash2, KeyRound, House, Warehouse, Truck, Plus, Hospital, Stethoscope } from 'lucide-react';
 import { API } from '../session';
 
 const TABS = {
@@ -14,6 +16,14 @@ const TABS = {
     warehouse: {
         label: 'Warehouses', idField: 'warehouse_id', path: 'warehouses', add: 'Register warehouse', icon: Warehouse,
         newTitle: 'Register a new warehouse', help: 'Warehouses hold stock and send out shipments.',
+    },
+    hospital: {
+        label: 'Hospitals', idField: 'hospital_id', path: 'hospitals', add: 'Register hospital', icon: Hospital,
+        newTitle: 'Register a new hospital', help: 'Hospitals hold on-call doctors for medical dispatch.',
+    },
+    doctor: {
+        label: 'Doctors', idField: 'doctor_id', path: 'doctors', add: 'Add doctor', icon: Stethoscope,
+        newTitle: 'Add an on-call doctor', help: 'Each doctor is linked to one hospital and one specialty.',
     },
     driver: {
         label: 'Drivers', idField: 'driver_id', path: 'drivers', add: 'Add driver', icon: Truck,
@@ -30,7 +40,7 @@ function taskCounts(shipments, driverId) {
     };
 }
 
-function SitesPanel({ shelters, warehouses, drivers, users, shipments, onChanged }) {
+function SitesPanel({ shelters, warehouses, drivers, users, shipments, hospitals = [], onChanged }) {
     const [tab, setTab] = useState('shelter');
     const [formItem, setFormItem] = useState(null);
     const [confirmId, setConfirmId] = useState(null);
@@ -38,7 +48,8 @@ function SitesPanel({ shelters, warehouses, drivers, users, shipments, onChanged
     const [error, setError] = useState('');
 
     const t = TABS[tab];
-    const lists = { shelter: shelters, warehouse: warehouses, driver: drivers };
+    const doctors = hospitals.flatMap((h) => (h.doctors || []).map((d) => ({ ...d, hospital_name: h.name })));
+    const lists = { shelter: shelters, warehouse: warehouses, hospital: hospitals, doctor: doctors, driver: drivers };
     const list = lists[tab];
     const loginOf = (id) => {
         const user = users.find((u) => u[t.idField] === id);
@@ -48,6 +59,7 @@ function SitesPanel({ shelters, warehouses, drivers, users, shipments, onChanged
     const allSites = [
         ...shelters.map((s) => ({ id: s.shelter_id, latitude: s.latitude, longitude: s.longitude })),
         ...warehouses.map((w) => ({ id: w.warehouse_id, latitude: w.latitude, longitude: w.longitude })),
+        ...hospitals.map((h) => ({ id: h.hospital_id, latitude: h.latitude, longitude: h.longitude })),
     ];
     const editingId = formItem && formItem !== 'new' ? formItem[t.idField] : null;
 
@@ -92,6 +104,19 @@ function SitesPanel({ shelters, warehouses, drivers, users, shipments, onChanged
         if (tab === 'driver') {
             return (
                 <DriverForm key={editingId || 'new'} driver={item} currentLogin={currentLogin}
+                    onSaved={handleSaved} onCancel={() => setFormItem(null)} />
+            );
+        }
+        if (tab === 'hospital') {
+            return (
+                <HospitalForm key={editingId || 'new'} hospital={item}
+                    otherSites={allSites.filter((s) => s.id !== editingId)}
+                    onSaved={handleSaved} onCancel={() => setFormItem(null)} />
+            );
+        }
+        if (tab === 'doctor') {
+            return (
+                <DoctorForm key={editingId || 'new'} doctor={item} hospitals={hospitals}
                     onSaved={handleSaved} onCancel={() => setFormItem(null)} />
             );
         }
@@ -141,8 +166,11 @@ function SitesPanel({ shelters, warehouses, drivers, users, shipments, onChanged
                         <tr>
                             <th>ID</th><th>Name</th>
                             {tab === 'shelter' && <th>Priority</th>}
-                            {tab === 'driver' ? <><th>Phone</th><th>Tasks</th></> : <th>Location</th>}
-                            <th>Login</th><th></th>
+                            {tab === 'doctor' && <><th>Specialty</th><th>Hospital</th><th>Status</th></>}
+                            {tab === 'driver' && <><th>Phone</th><th>Tasks</th></>}
+                            {(tab === 'shelter' || tab === 'warehouse' || tab === 'hospital') && <th>Location</th>}
+                            {(tab === 'shelter' || tab === 'warehouse' || tab === 'driver') && <th>Login</th>}
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -155,20 +183,32 @@ function SitesPanel({ shelters, warehouses, drivers, users, shipments, onChanged
                                     <td><IdLink type={tab} id={id} /></td>
                                     <td>{item.name}</td>
                                     {tab === 'shelter' && <td>{item.priority}</td>}
-                                    {tab === 'driver'
-                                        ? <>
+                                    {tab === 'doctor' && (
+                                        <>
+                                            <td>{item.specialty}</td>
+                                            <td><IdLink type="hospital" id={item.hospital_id} label={item.hospital_name || item.hospital_id} /></td>
+                                            <td>{item.status}</td>
+                                        </>
+                                    )}
+                                    {tab === 'driver' && (
+                                        <>
                                             <td>{item.phone || '-'}</td>
                                             <td>
                                                 <IdLink type="driver" id={id}
                                                     label={`${tasks.active} active · ${tasks.delivered} delivered${tasks.returned ? ` · ${tasks.returned} failed` : ''}`} />
                                             </td>
                                         </>
-                                        : <td>{Number(item.latitude).toFixed(4)}, {Number(item.longitude).toFixed(4)}</td>}
-                                    <td>
-                                        {username
-                                            ? <span className="icon-text"><KeyRound size={14} /> {username}</span>
-                                            : <span className="muted">No login</span>}
-                                    </td>
+                                    )}
+                                    {(tab === 'shelter' || tab === 'warehouse' || tab === 'hospital') && (
+                                        <td>{Number(item.latitude).toFixed(4)}, {Number(item.longitude).toFixed(4)}</td>
+                                    )}
+                                    {(tab === 'shelter' || tab === 'warehouse' || tab === 'driver') && (
+                                        <td>
+                                            {username
+                                                ? <span className="icon-text"><KeyRound size={14} /> {username}</span>
+                                                : <span className="muted">No login</span>}
+                                        </td>
+                                    )}
                                     <td>
                                         {confirmId === id ? (
                                             <div className="actions">
@@ -178,7 +218,7 @@ function SitesPanel({ shelters, warehouses, drivers, users, shipments, onChanged
                                         ) : (
                                             <div className="actions">
                                                 <button className="secondary small" onClick={() => { clearNotes(); setFormItem(item); }}>
-                                                    {username ? 'Edit' : 'Edit / add login'}
+                                                    {tab === 'hospital' || tab === 'doctor' ? 'Edit' : username ? 'Edit' : 'Edit / add login'}
                                                 </button>
                                                 <button className="danger-outline icon-button" title="Delete" aria-label={`Delete ${item.name}`}
                                                     onClick={() => { clearNotes(); setConfirmId(id); }}>

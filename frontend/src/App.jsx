@@ -17,6 +17,8 @@ import ShipmentsPanel from './components/ShipmentsPanel';
 import ShipmentTracker from './components/ShipmentTracker';
 import DriverView from './components/DriverView';
 import ReportsPanel from './components/ReportsPanel';
+import MedicalBoard from './components/MedicalBoard';
+import MedicalReviewQueue from './components/MedicalReviewQueue';
 import DetailDrawer from './components/DetailDrawer';
 import AccountPanel from './components/AccountPanel';
 import ShortageList from './components/ShortageList';
@@ -31,22 +33,22 @@ import { API, installAuthFetch, loadSession, setCurrentSession, onSessionExpired
 installAuthFetch();
 
 const ROLE_PAGES = {
-    coordinator: ['dashboard', 'requests', 'inventory', 'sites', 'allocation', 'shipments', 'reports', 'account'],
+    coordinator: ['dashboard', 'requests', 'medical', 'inventory', 'sites', 'allocation', 'shipments', 'reports', 'account'],
     shelter: ['my-requests', 'incoming', 'account'],
     warehouse: ['stock', 'outgoing', 'account'],
     driver: ['deliveries', 'account'],
 };
 
 const ROLE_DATA = {
-    coordinator: ['requests', 'inventory', 'allocations/log', 'shelters', 'warehouses', 'shipments', 'drivers', 'stock/movements', 'users', 'incidents', 'items'],
-    shelter: ['requests', 'shelters', 'warehouses', 'shipments', 'items'],
+    coordinator: ['requests', 'inventory', 'allocations/log', 'shelters', 'warehouses', 'shipments', 'drivers', 'stock/movements', 'users', 'incidents', 'items', 'hospitals', 'medical'],
+    shelter: ['requests', 'shelters', 'warehouses', 'shipments', 'items', 'medical', 'hospitals'],
     warehouse: ['inventory', 'shelters', 'warehouses', 'shipments', 'stock/movements', 'shortages'],
     driver: ['shelters', 'warehouses', 'shipments', 'incidents'],
 };
 
 const DATA_KEYS = { 'allocations/log': 'log', 'stock/movements': 'movements' };
 
-const EMPTY = { requests: [], inventory: [], log: [], shelters: [], warehouses: [], shipments: [], drivers: [], movements: [], users: [], shortages: [], items: [], incidents: [] };
+const EMPTY = { requests: [], inventory: [], log: [], shelters: [], warehouses: [], shipments: [], drivers: [], movements: [], users: [], shortages: [], items: [], incidents: [], hospitals: [], medical: [] };
 
 const SUBTITLES = {
     dashboard: 'Overview of requests, stock and locations',
@@ -55,8 +57,9 @@ const SUBTITLES = {
     sites: 'Register shelters, warehouses and drivers, and give them logins',
     allocation: 'Run the allocation engine and see what was sent',
     shipments: 'Assign drivers and track every delivery',
-    reports: 'Export fulfilled and unfulfilled requests',
-    'my-requests': 'Ask for supplies and follow each request until it arrives',
+    reports: 'Export fulfilled and unfulfilled requests, and medical dispatches',
+    medical: 'Assign the nearest hospital and an on-call doctor',
+    'my-requests': 'Ask for supplies or a doctor, and follow each request',
     incoming: 'Deliveries on their way to you, and what happened to each',
     stock: 'Add or remove stock, and see every change',
     outgoing: 'Where your stock went, when, and any incidents',
@@ -133,7 +136,7 @@ function Workspace({ user, onLogout, onSessionChange }) {
         return () => { cancelled = true; };
     }, [user.role]);
 
-    const { requests, inventory, log, shelters, warehouses, shipments, drivers, movements, users, shortages, items, incidents } = data;
+    const { requests, inventory, log, shelters, warehouses, shipments, drivers, movements, users, shortages, items, incidents, hospitals, medical } = data;
     // Prefer /items; if that list is empty (e.g. page loaded before it was fetched), use stocked inventory names
     const requestItems = items.length > 0
         ? items
@@ -150,6 +153,7 @@ function Workspace({ user, onLogout, onSessionChange }) {
     const badges = {
         requests: count('Awaiting review'),
         shipments: shipments.filter((s) => s.status === 'Ready' && !s.driver_id).length,
+        medical: medical.filter((r) => r.status === 'Dispatched' || r.status === 'Awaiting review' || String(r.status).startsWith('Pending')).length,
         incoming: shipments.filter((s) => s.status === 'In transit').length,
         outgoing: shipments.filter((s) => s.status === 'Ready' || s.status === 'Returning').length,
         deliveries: shipments.filter((s) => ['Ready', 'In transit', 'Returning'].includes(s.status)).length,
@@ -197,7 +201,7 @@ function Workspace({ user, onLogout, onSessionChange }) {
                             </div>
                             <SituationBrief version={data} />
                             <div className="dash-grid">
-                                <MapView shelters={shelters} warehouses={warehouses} requests={requests} inventory={inventory} />
+                                <MapView shelters={shelters} warehouses={warehouses} requests={requests} inventory={inventory} hospitals={hospitals} medical={medical} />
                                 <DashboardSide
                                     requests={requests}
                                     shelters={shelters}
@@ -205,9 +209,11 @@ function Workspace({ user, onLogout, onSessionChange }) {
                                     warehouses={warehouses}
                                     shipments={shipments}
                                     incidents={incidents}
+                                    medical={medical}
                                     onIncidentsChanged={loadAll}
                                     onOpenRequests={openRequests}
                                     onOpenShipments={() => goTo('shipments')}
+                                    onOpenMedical={() => goTo('medical')}
                                     onRunAllocation={runAllocation}
                                 />
                             </div>
@@ -230,7 +236,15 @@ function Workspace({ user, onLogout, onSessionChange }) {
                     )}
 
                     {page === 'sites' && (
-                        <SitesPanel shelters={shelters} warehouses={warehouses} drivers={drivers} users={users} shipments={shipments} onChanged={loadAll} />
+                        <SitesPanel shelters={shelters} warehouses={warehouses} drivers={drivers} users={users} shipments={shipments} hospitals={hospitals} onChanged={loadAll} />
+                    )}
+
+                    {page === 'medical' && (
+                        <>
+                            <NewRequestForm asCoordinator startKind="doctor" shelters={shelters} items={requestItems} onCreated={loadAll} />
+                            <MedicalReviewQueue medical={medical} onChanged={loadAll} />
+                            <MedicalBoard medical={medical} hospitals={hospitals} onChanged={loadAll} />
+                        </>
                     )}
 
                     {page === 'allocation' && <AllocationLog log={log} />}
@@ -240,13 +254,14 @@ function Workspace({ user, onLogout, onSessionChange }) {
                     {page === 'reports' && (
                         <>
                             <DamagePatterns version={data} />
-                            <ReportsPanel requests={requests} />
+                            <ReportsPanel requests={requests} medical={medical} />
                         </>
                     )}
 
                     {page === 'my-requests' && (
                         <>
                             <NewRequestForm shelter={myShelter} items={requestItems} onCreated={loadAll} />
+                            <MedicalBoard medical={medical} hospitals={hospitals} canComplete onChanged={loadAll} />
                             <RequestsTable requests={requests} shelters={shelters} filter={statusFilter} onFilterChange={setStatusFilter} />
                         </>
                     )}

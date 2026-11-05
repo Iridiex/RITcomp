@@ -3,6 +3,7 @@ const knex = require('knex')(require('../knexfile').development);
 const fs = require('fs');
 const path = require('path');
 const { parse } = require('csv-parse/sync');
+const { seedMedical } = require('../src/seedMedical');
 
 function readCsv(fileName) {
     const filePath = path.join(__dirname, '../data/sample', fileName);
@@ -14,6 +15,9 @@ async function main() {
     await knex.migrate.latest({ directory: path.join(__dirname, '../migrations') });
     await knex('incidents').del();
     await knex('shipment_notes').del();
+    await knex('medical_requests').del();
+    await knex('doctors').del();
+    await knex('hospitals').del();
     await knex('shipments').del();
     await knex('allocation_log').del();
     await knex('requests').del();
@@ -65,6 +69,7 @@ async function main() {
         item: row.item.trim().toLowerCase(),
     }));
     await knex('requests').insert(requests);
+    await seedMedical(knex, { replace: true });
 
     console.log('Database reset with sample data');
     await knex.destroy();

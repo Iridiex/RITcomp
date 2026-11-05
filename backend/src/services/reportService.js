@@ -1,4 +1,5 @@
 const knex = require('../db');
+const { listMedical } = require('./medicalService');
 
 const PROCESSED = ['Fulfilled', 'Allocated', 'Partial', 'Unfulfilled'];
 
@@ -75,6 +76,17 @@ async function buildReport() {
         rejected: withStatus(['Rejected', 'Cancelled']),
         damaged,
         inventory: await knex('inventory').orderBy(['warehouse_id', 'item']),
+        medical: (await listMedical()).map((r) => ({
+            medical_id: r.medical_id,
+            doctor_id: r.doctor_id || '',
+            specialty: r.specialty,
+            hospital_id: r.hospital_id || '',
+            hospital_name: r.hospital_name || '',
+            travel_distance: r.distance == null ? '' : Number(Number(r.distance).toFixed(6)),
+            status: r.status,
+            shelter_name: r.shelter_name,
+            shelter_id: r.shelter_id,
+        })),
     };
 }
 

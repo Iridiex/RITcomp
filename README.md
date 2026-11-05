@@ -16,12 +16,13 @@ Cambridge International School, Dubai
 
 | Requirement | How Relief Dispatch meets it |
 |---|---|
-| Data models | Inventory, Requests, Shelters, Warehouses, Shipments, Drivers, Users and logs in SQLite, managed by Knex migrations |
-| Priority allocation engine | Urgency first (Critical > High > Medium > Low), then shelter priority, then oldest request |
+| Data models | Inventory, Requests, Shelters, Warehouses, Hospitals, On-call doctors, Shipments, Drivers, Users and logs in SQLite, managed by Knex migrations |
+| Priority allocation engine | Urgency first (Critical > High > Moderate), then shelter priority, then oldest request |
 | Inventory tracking | Stock is reserved as it is allocated and can never go below zero. Shortfalls are marked Partial or Unfulfilled |
+| Nearest medical dispatch | A shelter medical request is matched to the nearest hospital that currently has an available doctor of that specialty (Euclidean distance). The doctor is marked Dispatched so they cannot be double-booked. If none are free, the ticket is Pending Medical Dispatch - High Urgency |
 | User interface | React web portal with separate views for coordinator, shelter, warehouse and driver |
-| Export and reporting | Fulfilled vs unfulfilled summary as PDF, CSV or JSON |
-| Automated testing | Jest + Supertest suite covering allocation, stock limits, permissions and delivery flows |
+| Export and reporting | Fulfilled vs unfulfilled summary as PDF, CSV or JSON, plus a medical-dispatch CSV (Doctor ID, Specialty, Hospital Name, Travel Distance) |
+| Automated testing | Jest + Supertest suite covering allocation, stock limits, permissions, delivery flows and medical dispatch |
 
 Beyond the brief:
 
@@ -58,7 +59,7 @@ cd backend
 npm install
 cp .env.example .env
 npx knex migrate:latest
-npx knex seed:run
+npm run reset
 npm run dev
 ```
 
@@ -116,5 +117,14 @@ Awaiting review → Pending → Allocated / Partial / Unfulfilled → Fulfilled 
 Ready → In transit → Delivered (or Returned)
 
 Damage at pickup or on arrival writes off the goods and dispatches a replacement.
+
+## Medical dispatch
+
+1. A shelter asks for a specialty and writes why. The coordinator reviews it. Logging it as coordinator skips review.
+2. On approval, hospitals that currently have an **Available** doctor of that specialty are kept.
+3. Distance is \(d=\sqrt{(x_2-x_1)^2+(y_2-y_1)^2}\) using each site's stored coordinates.
+4. The nearest of those hospitals is chosen and its doctor is marked **Dispatched**.
+5. If the nearest hospital has no matching doctor, the next-closest eligible hospital is used.
+6. If none are free, the ticket is **Pending Medical Dispatch - High Urgency**. When the shelter marks the doctor arrived, that doctor is freed and the oldest waiting ticket of the same specialty is filled.
 
 ## Project structure

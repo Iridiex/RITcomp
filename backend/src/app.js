@@ -13,12 +13,16 @@ const cors = require('cors');
 const { runAllocation, listShortages } = require('./services/allocationService');
 const { createRequest, reviewRequest, closeRequest, listItems } = require('./services/requestService');
 const { checkUrgency } = require('./ai/urgency');
+const { checkSpecialty } = require('./ai/specialty');
 const { getBrief, writeBrief } = require('./ai/brief');
 const { transcribe, MAX_AUDIO_BYTES } = require('./ai/language');
 const { aiEnabled } = require('./ai/gemini');
 const { activeAlerts, resolveIncident } = require('./services/incidentService');
 const { getPatterns, findPatterns } = require('./ai/patterns');
 const { askAssistant } = require('./ai/assistant');
+const { listHospitals, listDoctors, listMedical, createMedical, reviewMedical, completeMedical } = require('./services/medicalService');
+const { createHospital, updateHospital, deleteHospital } = require('./services/hospitalService');
+const { createDoctor, updateDoctor, deleteDoctor } = require('./services/doctorService');
 
 const app = express();
 
@@ -127,6 +131,53 @@ app.get('/api/shelters', async(req, res) => {
     }
 });
 
+app.get('/api/hospitals', async (req, res) => {
+    try { res.json(await listHospitals()); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/doctors', async (req, res) => {
+    try { res.json(await listDoctors()); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/medical', async (req, res) => {
+    try { res.json(await listMedical(req.user.role === 'shelter' ? req.user.shelter_id : null)); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/medical', async (req, res) => {
+    try {
+        const result = await createMedical(req.body);
+        if (result.errors) return res.status(400).json({ errors: result.errors });
+        res.status(201).json(result.request);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.patch('/api/medical/:id/review', async (req, res) => {
+    try {
+        const result = await reviewMedical(req.params.id, req.body);
+        if (result.notFound) return res.status(404).json({ error: 'Not found' });
+        if (result.errors) return res.status(400).json({ errors: result.errors });
+        res.json(result.row);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.patch('/api/medical/:id/complete', async (req, res) => {
+    try {
+        const result = await completeMedical(req.params.id);
+        if (result.notFound) return res.status(404).json({ error: 'Not found' });
+        if (result.errors) return res.status(400).json({ errors: result.errors });
+        res.json(result.row);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/warehouses', async (req, res) => {
     try {
         const warehouses = await knex('warehouses').orderBy('warehouse_id');
@@ -180,6 +231,13 @@ const CSV_COLUMNS = [
     { key: 'note', label: 'Review note' },
 ];
 
+const MEDICAL_CSV_COLUMNS = [
+    { key: 'doctor_id', label: 'Doctor ID' },
+    { key: 'specialty', label: 'Specialty' },
+    { key: 'hospital_name', label: 'Hospital Name' },
+    { key: 'travel_distance', label: 'Travel Distance' },
+];
+
 function reportName(extension) {
     return 'relief-report-' + new Date().toISOString().slice(0, 10) + '.' + extension;
 }
@@ -206,6 +264,16 @@ app.get('/api/reports/requests.csv', async (req, res) => {
     }
 });
 
+app.get('/api/reports/medical.csv', async (req, res) => {
+    try {
+        const report = await buildReport();
+        res.attachment('medical-dispatch-' + new Date().toISOString().slice(0, 10) + '.csv');
+        res.send(toCsv(report.medical, MEDICAL_CSV_COLUMNS));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/reports/report.pdf', async (req, res) => {
     try {
         const report = await buildReport();
@@ -223,6 +291,36 @@ app.delete('/api/shelters/:id', async (req, res) => {
 
 app.delete('/api/warehouses/:id', async (req, res) => {
     try { sendResult(res, await deleteSite('warehouse', req.params.id), 200); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/hospitals', async (req, res) => {
+    try { sendResult(res, await createHospital(req.body), 201); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.patch('/api/hospitals/:id', async (req, res) => {
+    try { sendResult(res, await updateHospital(req.params.id, req.body), 200); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/hospitals/:id', async (req, res) => {
+    try { sendResult(res, await deleteHospital(req.params.id), 200); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/doctors', async (req, res) => {
+    try { sendResult(res, await createDoctor(req.body), 201); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.patch('/api/doctors/:id', async (req, res) => {
+    try { sendResult(res, await updateDoctor(req.params.id, req.body), 200); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/doctors/:id', async (req, res) => {
+    try { sendResult(res, await deleteDoctor(req.params.id), 200); }
     catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -301,6 +399,16 @@ app.post('/api/urgency/check', async (req, res) => {
         const { item, quantity, reason } = req.body;
         if (!String(reason || '').trim()) return res.status(400).json({ errors: ['Write a reason to check'] });
         res.json(await checkUrgency({ item, quantity, reason }));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/specialty/check', async (req, res) => {
+    try {
+        const { specialty, reason } = req.body;
+        if (!String(reason || '').trim()) return res.status(400).json({ errors: ['Write a reason to check'] });
+        res.json(await checkSpecialty({ specialty, reason }));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

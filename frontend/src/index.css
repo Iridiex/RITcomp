@@ -1069,6 +1069,10 @@ p.errors {
     color: var(--text);
 }
 
+.request-kind {
+    margin-bottom: 4px;
+}
+
 .request-form {
     margin-top: 14px;
     align-items: start;
